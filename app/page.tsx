@@ -1,65 +1,153 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { AppShell } from "@/components/AppShell";
+import { ExpenseBreakdownCharts } from "@/components/Charts";
+import { StatCard } from "@/components/StatCard";
+import { fetchJson } from "@/lib/client-utils";
+import { Role, SummaryResponse } from "@/lib/types";
+
+type SummaryApiResponse = {
+  role: Role;
+  usingMockDb: boolean;
+  summary: SummaryResponse;
+};
+
+const emptySummary: SummaryResponse = {
+  totalIncome: 0,
+  advanceReceived: 0,
+  pendingPayments: 0,
+  totalExpenses: 0,
+  profit: 0,
+  expensesByCategory: [],
+  expensesByPerson: [],
+};
+
+export default function DashboardPage() {
+  const [role, setRole] = useState<Role>("viewer");
+  const [usingMockDb, setUsingMockDb] = useState(false);
+  const [summary, setSummary] = useState<SummaryResponse>(emptySummary);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true);
+        const result = await fetchJson<SummaryApiResponse>("/api/summary");
+        setRole(result.role);
+        setUsingMockDb(result.usingMockDb);
+        setSummary(result.summary);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load summary");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <AppShell
+      title="Business Dashboard"
+      subtitle="Income, expenses, pending payments, and live profitability in one screen"
+      role={role}
+      setRole={setRole}
+    >
+      {usingMockDb && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Running in `MOCK_DB` mode. Set Google Sheets credentials in
+          `.env.local` to use production data.
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      )}
+
+      {error && (
+        <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-4 shrink-0 font-semibold hover:text-rose-700"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            ✕
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-4">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div className="mb-2 h-3 w-24 rounded bg-slate-200" />
+                <div className="h-8 w-32 rounded bg-slate-200" />
+              </div>
+            ))}
+          </section>
+          <div className="animate-pulse rounded-2xl border border-slate-200 bg-white p-5 shadow-sm h-48" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard
+              label="Total Income"
+              value={summary.totalIncome}
+              tone="positive"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <StatCard
+              label="Advance Received"
+              value={summary.advanceReceived}
+              tone="positive"
+            />
+            <StatCard
+              label="Pending Payments"
+              value={summary.pendingPayments}
+              tone="negative"
+            />
+            <StatCard
+              label="Total Expenses"
+              value={summary.totalExpenses}
+              tone="negative"
+            />
+            <StatCard
+              label="Profit"
+              value={summary.profit}
+              tone={summary.profit >= 0 ? "positive" : "negative"}
+            />
+          </section>
+
+          <ExpenseBreakdownCharts
+            byCategory={summary.expensesByCategory}
+            byPerson={summary.expensesByPerson}
+          />
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-base font-semibold">Smart Suggestions</h3>
+            <ul className="mt-3 space-y-2 text-sm text-slate-700">
+              <li>
+                Track every income entry with payment status to reduce cash flow
+                blind spots.
+              </li>
+              <li>
+                Use categories consistently (`Asset`, `Operations`, `Travel`,
+                `Marketing`) for cleaner analytics.
+              </li>
+              <li>
+                Review pending payments weekly and send reminders from the
+                Income page.
+              </li>
+              <li>
+                Keep team roles strict: Admin full control, Manager operations,
+                Staff entries, Viewer read-only.
+              </li>
+            </ul>
+          </section>
         </div>
-      </main>
-    </div>
+      )}
+    </AppShell>
   );
 }
