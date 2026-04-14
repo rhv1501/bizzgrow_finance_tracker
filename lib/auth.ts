@@ -26,11 +26,13 @@ export async function getSession(): Promise<AuthSession | null> {
     .eq("id", user.id)
     .single();
 
+  const role = (profile?.role as Role) || user.user_metadata?.role || "employee";
+
   return {
     userId: user.id,
     name: profile?.name || user.user_metadata?.name || "Unknown",
     email: user.email || "",
-    role: (profile?.role as Role) || "employee",
+    role,
   };
 }
 
