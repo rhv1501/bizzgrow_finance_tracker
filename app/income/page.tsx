@@ -7,6 +7,7 @@ import { fetchJson, formatCurrency, formatDate } from "@/lib/client-utils";
 import { Client, Income, Service } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { useSession } from "@/components/SessionProvider";
+import { useOffline } from "@/components/OfflineProvider";
 
 const defaultForm = {
   client_id: "",
@@ -25,6 +26,7 @@ const defaultNewService = { name: "", price: 0 };
 
 export default function IncomePage() {
   const { role } = useSession();
+  const { isOffline } = useOffline();
   const { month, year } = useGlobalFilter();
   const [rawRows, setRawRows] = useState<Income[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -276,7 +278,7 @@ export default function IncomePage() {
             )}
           </div>
           <fieldset
-            disabled={submitting}
+            disabled={submitting || isOffline}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
           >
             <div className="flex flex-col gap-2">

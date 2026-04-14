@@ -6,6 +6,7 @@ import { fetchJson, formatCurrency, formatDate } from "@/lib/client-utils";
 import { Reimbursement, Client } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { useSession } from "@/components/SessionProvider";
+import { useOffline } from "@/components/OfflineProvider";
 
 const EXPENSE_CATEGORIES = [
   "Software Subscriptions",
@@ -21,6 +22,7 @@ const EXPENSE_CATEGORIES = [
 
 export default function ReimbursementsPage() {
   const { role, user } = useSession();
+  const { isOffline } = useOffline();
   const [items, setItems] = useState<Reimbursement[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [submitting, setSubmitting] = useState(false);

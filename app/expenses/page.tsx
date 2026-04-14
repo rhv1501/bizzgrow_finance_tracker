@@ -6,6 +6,7 @@ import { useGlobalFilter } from "@/components/GlobalFilterProvider";
 import { fetchJson, formatCurrency, formatDate } from "@/lib/client-utils";
 import { createClient } from "@/lib/supabase/client";
 import { useSession } from "@/components/SessionProvider";
+import { useOffline } from "@/components/OfflineProvider";
 import { Expense, User } from "@/lib/types";
 
 const defaultForm = {
@@ -22,6 +23,7 @@ const defaultForm = {
 export default function ExpensesPage() {
   const { month, year } = useGlobalFilter();
   const { role } = useSession();
+  const { isOffline } = useOffline();
   const [rawRows, setRawRows] = useState<Expense[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [form, setForm] = useState(defaultForm);

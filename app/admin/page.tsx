@@ -2,9 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { fetchJson, formatCurrency } from "@/lib/client-utils";
+import { fetchJson, formatCurrency, formatDate } from "@/lib/client-utils";
 import { AuditLog, Client, Role, Service, User } from "@/lib/types";
 import { useSession } from "@/components/SessionProvider";
+import { useOffline } from "@/components/OfflineProvider";
 
 type ApiList<T> = { role?: Role; data: T[] };
 type CreatedUserResponse = {
@@ -28,6 +29,7 @@ type PasswordResetResponse = {
 
 export default function AdminPage() {
   const { role } = useSession();
+  const { isOffline } = useOffline();
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -300,11 +302,11 @@ export default function AdminPage() {
                 value={clientName}
                 onChange={(event) => setClientName(event.target.value)}
                 required
-                disabled={addingClient}
+                disabled={addingClient || isOffline}
               />
               <button
                 className="rounded-xl bg-foreground text-background px-4 py-2 text-xs font-black uppercase disabled:opacity-50 transition-all hover:opacity-90"
-                disabled={addingClient}
+                disabled={addingClient || isOffline}
               >
                 {addingClient ? "…" : "Add"}
               </button>
@@ -375,11 +377,11 @@ export default function AdminPage() {
                     }))
                     }
                     required
-                    disabled={addingService}
+                    disabled={addingService || isOffline}
                 />
                 <button
                     className="rounded-xl bg-foreground text-background px-4 py-2 text-xs font-black uppercase disabled:opacity-50 transition-all hover:opacity-90"
-                    disabled={addingService}
+                    disabled={addingService || isOffline}
                 >
                     {addingService ? "..." : "Add"}
                 </button>
@@ -470,7 +472,7 @@ export default function AdminPage() {
               </div>
               <button
                 className="w-full rounded-xl bg-foreground text-background px-4 py-3 text-xs font-black uppercase disabled:opacity-50 transition-all hover:opacity-90 shadow-md"
-                disabled={addingUser}
+                disabled={addingUser || isOffline}
               >
                 {addingUser ? "Provisioning…" : "Create User account"}
               </button>
@@ -550,7 +552,8 @@ export default function AdminPage() {
                           title="Generate New Password"
                           disabled={
                             savingRoleUserId === user.id ||
-                            resettingPasswordUserId === user.id
+                            resettingPasswordUserId === user.id ||
+                            isOffline
                           }
                         >
                           {resettingPasswordUserId === user.id ? "..." : "Reset"}
@@ -562,7 +565,8 @@ export default function AdminPage() {
                           disabled={
                             savingRoleUserId === user.id ||
                             resettingPasswordUserId === user.id ||
-                            deletingUserId === user.id
+                            deletingUserId === user.id ||
+                            isOffline
                           }
                         >
                           {deletingUserId === user.id ? "..." : "Delete"}

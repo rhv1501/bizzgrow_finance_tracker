@@ -86,7 +86,7 @@ export function ExpenseBreakdownCharts({
                 plugins: {
                     legend: {
                         position: 'bottom' as const,
-                        labels: { color: textColor, padding: 20, usePointStyle: true, font: { size: 10, weight: 'bold' } }
+                        labels: { color: textColor, padding: 20, usePointStyle: true, font: { size: 10, weight: 'bold' as const } }
                     }
                 }
             }}
@@ -142,7 +142,7 @@ export function TrendCharts({
     plugins: {
       legend: {
         position: 'top' as const,
-        labels: { color: textColor, usePointStyle: true, font: { size: 11, weight: 'bold' } }
+        labels: { color: textColor, usePointStyle: true, font: { size: 11, weight: 'bold' as const } }
       }
     },
     scales: {

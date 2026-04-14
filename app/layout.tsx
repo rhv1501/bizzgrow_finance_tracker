@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import { SessionProvider } from "@/components/SessionProvider";
 import { GlobalFilterProvider } from "@/components/GlobalFilterProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { OfflineProvider } from "@/components/OfflineProvider";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -15,10 +16,18 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#fbbf24",
+};
+
 export const metadata: Metadata = {
   title: "Finance Tracker Pro",
-  description:
-    "Comprehensive business income and expense tracker for BizzGrow.",
+  description: "Comprehensive business income and expense tracker for BizzGrow.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Finance Tracker Pro",
+  },
 };
 
 export default function RootLayout({
@@ -39,7 +48,9 @@ export default function RootLayout({
         >
           <SessionProvider>
             <GlobalFilterProvider>
-              {children}
+              <OfflineProvider>
+                {children}
+              </OfflineProvider>
             </GlobalFilterProvider>
           </SessionProvider>
         </ThemeProvider>
