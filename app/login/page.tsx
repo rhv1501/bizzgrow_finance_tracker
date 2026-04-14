@@ -27,7 +27,7 @@ export default function LoginPage() {
       try {
         const result = await fetchJson<MeResponse>("/api/auth/me");
         router.replace(
-          result.requiresPasswordChange ? "/change-password" : "/",
+          result.requiresPasswordChange ? "/change-password" : (result.user.role === "employee" ? "/reimbursements" : "/")
         );
       } catch {
         // Not logged in; stay on login page.
@@ -45,7 +45,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const result = await fetchJson<{ requiresPasswordChange?: boolean }>(
+      const result = await fetchJson<{ requiresPasswordChange?: boolean; user: { role: string } }>(
         "/api/auth/login",
         {
           method: "POST",
@@ -59,7 +59,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/");
+      router.push(result.user.role === "employee" ? "/reimbursements" : "/");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -122,10 +122,7 @@ export default function LoginPage() {
           >
             {submitting ? "Signing in..." : "Sign in"}
           </button>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            First-time admin login: <strong>admin@bizzgrow.com</strong> /{" "}
-            <strong>Admin@123</strong>
-          </div>
+
         </form>
       </div>
     </main>

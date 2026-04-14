@@ -1,9 +1,10 @@
 import { fail, ok, parseZodError } from "@/lib/api";
 import { deleteRow, listRows, updateRow } from "@/lib/db";
-import { getSessionFromRequest, requirePermission } from "@/lib/auth";
+import { getSession, requirePermission } from "@/lib/auth";
 import { updateUserSchema } from "@/lib/schemas";
 import { User } from "@/lib/types";
-import { hashPassword, normalizeEmail } from "@/lib/security";
+import { normalizeEmail } from "@/lib/security";
+import { createAdminClient } from "@/lib/supabase/server";
 import { logAuditEvent } from "@/lib/audit";
 
 function sanitizeUser(user: User) {
@@ -17,12 +18,12 @@ function sanitizeUser(user: User) {
 }
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
-  const role = requirePermission(request, "manageUsers");
+  const role = await requirePermission("manageUsers");
   if (role instanceof Response) {
     return role;
   }
 
-  const session = getSessionFromRequest(request);
+  const session = await getSession();
   if (!session) {
     return fail("Authentication required", 401);
   }
@@ -39,6 +40,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 
     const payload: Record<string, unknown> = { ...parsed };
+    const adminClient = createAdminClient();
+    const authUpdatePayload: any = {};
+
     if (parsed.email) {
       const nextEmail = normalizeEmail(parsed.email);
       const conflict = users.find((user) => user.id !== id && normalizeEmail(user.email || "") === nextEmail);
@@ -47,12 +51,20 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       }
 
       payload.email = nextEmail;
+      authUpdatePayload.email = nextEmail;
     }
 
     if (parsed.password) {
-      payload.password_hash = hashPassword(parsed.password);
+      authUpdatePayload.password = parsed.password;
       payload.must_change_password = true;
       delete payload.password;
+    }
+    
+    if (Object.keys(authUpdatePayload).length > 0) {
+      const { error: authErr } = await adminClient.auth.admin.updateUserById(id, authUpdatePayload);
+      if (authErr) {
+        return fail(`Supabase Auth Update Failed: ${authErr.message}`, 400);
+      }
     }
 
     const updated = await updateRow<User>("users", id, payload);
@@ -79,15 +91,17 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const role = requirePermission(request, "manageUsers");
+  const role = await requirePermission("manageUsers");
   if (role instanceof Response) {
     return role;
   }
 
   const { id } = await context.params;
-  const deleted = await deleteRow("users", id);
-  if (!deleted) {
-    return fail("User not found", 404);
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.deleteUser(id);
+  
+  if (error) {
+    return fail(`Failed to delete user: ${error.message}`, 400);
   }
 
   return ok({ role, ok: true });

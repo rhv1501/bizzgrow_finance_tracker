@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { fail, ok, parseZodError } from "@/lib/api";
-import { getSessionFromRequest, unauthorizedResponse } from "@/lib/auth";
-import { listRows, updateRow } from "@/lib/db";
+import { getSession, unauthorizedResponse } from "@/lib/auth";
+import { updateRow } from "@/lib/db";
 import { User } from "@/lib/types";
-import { hashPassword, verifyPassword } from "@/lib/security";
+import { createClient } from "@/lib/supabase/server";
 
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
+  currentPassword: z.string().min(1).optional(),
   newPassword: z.string().min(8),
 });
 
 export async function POST(request: Request) {
-  const session = getSessionFromRequest(request);
+  const session = await getSession();
   if (!session) {
     return unauthorizedResponse();
   }
@@ -20,19 +20,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = changePasswordSchema.parse(body);
 
-    const users = await listRows<User>("users");
-    const user = users.find((candidate) => candidate.id === session.userId);
+    const supabase = await createClient();
+    const { error: authError } = await supabase.auth.updateUser({
+      password: parsed.newPassword
+    });
 
-    if (!user || !user.password_hash) {
-      return fail("User not found", 404);
+    if (authError) {
+      return fail(`Failed to update password: ${authError.message}`, 400);
     }
 
-    if (!verifyPassword(parsed.currentPassword, user.password_hash)) {
-      return fail("Current password is incorrect", 400);
-    }
-
-    await updateRow<User>("users", user.id, {
-      password_hash: hashPassword(parsed.newPassword),
+    await updateRow<User>("users", session.userId, {
       must_change_password: false,
     });
 
@@ -49,3 +46,4 @@ export async function POST(request: Request) {
     return fail(parseZodError(error), 400);
   }
 }
+

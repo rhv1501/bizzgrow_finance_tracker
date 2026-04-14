@@ -5,7 +5,7 @@ import { updateExpenseSchema } from "@/lib/schemas";
 import { Expense } from "@/lib/types";
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
-  const role = requirePermission(request, "updateTransaction");
+  const role = await requirePermission("manageCore");
   if (role instanceof Response) {
     return role;
   }
@@ -27,7 +27,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const role = requirePermission(request, "deleteTransaction");
+  const role = await requirePermission("manageCore");
   if (role instanceof Response) {
     return role;
   }

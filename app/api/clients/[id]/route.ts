@@ -5,7 +5,7 @@ import { updateClientSchema } from "@/lib/schemas";
 import { Client } from "@/lib/types";
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
-  const role = requirePermission(request, "manageMasterData");
+  const role = await requirePermission("manageMasterData");
   if (role instanceof Response) {
     return role;
   }
@@ -27,7 +27,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const role = requirePermission(request, "manageMasterData");
+  const role = await requirePermission("manageMasterData");
   if (role instanceof Response) {
     return role;
   }

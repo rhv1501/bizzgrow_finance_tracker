@@ -106,8 +106,8 @@ export function TrendCharts({
           data={{
             labels: Array.from(
               new Set([
-                ...monthlyIncome.map((x) => x.month),
-                ...monthlyExpenses.map((x) => x.month),
+                ...(monthlyIncome || []).map((x) => x.month),
+                ...(monthlyExpenses || []).map((x) => x.month),
               ]),
             ).sort(),
             datasets: [
@@ -115,14 +115,14 @@ export function TrendCharts({
                 label: "Income",
                 data: Array.from(
                   new Set([
-                    ...monthlyIncome.map((x) => x.month),
-                    ...monthlyExpenses.map((x) => x.month),
+                    ...(monthlyIncome || []).map((x) => x.month),
+                    ...(monthlyExpenses || []).map((x) => x.month),
                   ]),
                 )
                   .sort()
                   .map(
                     (month) =>
-                      monthlyIncome.find((entry) => entry.month === month)
+                      (monthlyIncome || []).find((entry) => entry.month === month)
                         ?.amount ?? 0,
                   ),
                 borderColor: "#16a34a",
@@ -133,14 +133,14 @@ export function TrendCharts({
                 label: "Expenses",
                 data: Array.from(
                   new Set([
-                    ...monthlyIncome.map((x) => x.month),
-                    ...monthlyExpenses.map((x) => x.month),
+                    ...(monthlyIncome || []).map((x) => x.month),
+                    ...(monthlyExpenses || []).map((x) => x.month),
                   ]),
                 )
                   .sort()
                   .map(
                     (month) =>
-                      monthlyExpenses.find((entry) => entry.month === month)
+                      (monthlyExpenses || []).find((entry) => entry.month === month)
                         ?.amount ?? 0,
                   ),
                 borderColor: "#dc2626",

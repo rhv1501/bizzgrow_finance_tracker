@@ -1,9 +1,9 @@
-import { getSummary, isUsingMockDb } from "@/lib/db";
+import { getSummary } from "@/lib/db";
 import { ok } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  const role = requirePermission(request, "read");
+  const role = await requirePermission("readCore");
   if (role instanceof Response) {
     return role;
   }
@@ -12,7 +12,6 @@ export async function GET(request: Request) {
 
   return ok({
     role,
-    usingMockDb: isUsingMockDb(),
     summary,
   });
 }

@@ -3,7 +3,7 @@ import { ok } from "@/lib/api";
 import { requirePermission } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  const role = requirePermission(request, "read");
+  const role = await requirePermission("readCore");
   if (role instanceof Response) {
     return role;
   }

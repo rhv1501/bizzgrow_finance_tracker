@@ -4,12 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { TrendCharts } from "@/components/Charts";
 import { fetchJson } from "@/lib/client-utils";
-import { AnalyticsResponse, Role } from "@/lib/types";
-
-type AnalyticsApiResponse = {
-  role: Role;
-  analytics: AnalyticsResponse;
-};
+import { useSession } from "@/components/SessionProvider";
+import { AnalyticsResponse } from "@/lib/types";
 
 const emptyAnalytics: AnalyticsResponse = {
   monthlyIncome: [],
@@ -19,7 +15,7 @@ const emptyAnalytics: AnalyticsResponse = {
 };
 
 export default function AnalyticsPage() {
-  const [role, setRole] = useState<Role>("viewer");
+  const { role } = useSession();
   const [analytics, setAnalytics] = useState<AnalyticsResponse>(emptyAnalytics);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +29,9 @@ export default function AnalyticsPage() {
     async function load() {
       try {
         setLoading(true);
-        const result = await fetchJson<AnalyticsApiResponse>("/api/analytics");
-        setRole(result.role);
+        const result = await fetchJson<{ analytics: AnalyticsResponse }>(
+          "/api/analytics",
+        );
         setAnalytics(result.analytics);
         setError(null);
       } catch (err) {
@@ -54,8 +51,8 @@ export default function AnalyticsPage() {
       ["Month", "Income", "Expenses", "Profit"],
       ...Array.from(
         new Set([
-          ...analytics.monthlyIncome.map((x) => x.month),
-          ...analytics.monthlyExpenses.map((x) => x.month),
+          ...analytics.monthlyIncome.map((entry) => entry.month),
+          ...analytics.monthlyExpenses.map((entry) => entry.month),
         ]),
       )
         .sort()
@@ -83,9 +80,7 @@ export default function AnalyticsPage() {
   return (
     <AppShell
       title="Analytics"
-      subtitle="Monthly trends, client revenue, and category-level cost intelligence"
-      role={role}
-      setRole={setRole}
+      subtitle="Visualize historical performance and predict future cash flows"
     >
       {error && (
         <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">

@@ -1,44 +1,55 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"];
+export async function proxy(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
 
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
-    pathname.startsWith("/public")
-  ) {
-    return NextResponse.next();
-  }
-
-  const isPublicPath = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value),
+          );
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
   );
 
-  const sessionCookie = request.cookies.get("ft_user_id")?.value;
-  const mustChangePassword = request.cookies.get("ft_must_change_password")?.value === "1";
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!sessionCookie && !isPublicPath) {
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+  const isAuthRoute =
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/api/auth");
+
+  if (!user && !isAuthRoute && !request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (sessionCookie && mustChangePassword && pathname !== "/change-password") {
-    return NextResponse.redirect(new URL("/change-password", request.url));
+  if (user && request.nextUrl.pathname === "/login") {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (sessionCookie && pathname === "/login") {
-    const destination = mustChangePassword ? "/change-password" : "/";
-    return NextResponse.redirect(new URL(destination, request.url));
-  }
-
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/((?!.*\\..*).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

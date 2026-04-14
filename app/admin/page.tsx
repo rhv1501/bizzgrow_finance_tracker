@@ -2,8 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { fetchJson } from "@/lib/client-utils";
+import { fetchJson, formatCurrency } from "@/lib/client-utils";
 import { AuditLog, Client, Role, Service, User } from "@/lib/types";
+import { useSession } from "@/components/SessionProvider";
 
 type ApiList<T> = { role?: Role; data: T[] };
 type CreatedUserResponse = {
@@ -26,7 +27,7 @@ type PasswordResetResponse = {
 };
 
 export default function AdminPage() {
-  const [role, setRole] = useState<Role>("viewer");
+  const { role } = useSession();
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -41,6 +42,8 @@ export default function AdminPage() {
     string | null
   >(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
+  const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
 
   const [clientName, setClientName] = useState("");
   const [serviceForm, setServiceForm] = useState({ name: "", price: 0 });
@@ -51,7 +54,7 @@ export default function AdminPage() {
     password: string;
   }>({
     name: "",
-    role: "staff",
+    role: "employee",
     email: "",
     password: "",
   });
@@ -78,13 +81,11 @@ export default function AdminPage() {
         fetchJson<ApiList<User>>("/api/users"),
       ]);
 
-      const resolvedRole = clientResult.role ?? userResult.role ?? role;
-      setRole(resolvedRole);
       setClients(clientResult.data);
       setServices(serviceResult.data);
       setUsers(userResult.data);
 
-      if (resolvedRole === "admin") {
+      if (role === "admin") {
         const auditResult =
           await fetchJson<ApiList<AuditLog>>("/api/audit-logs");
         setAuditLogs(auditResult.data);
@@ -155,6 +156,32 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteClient(id: string) {
+    if (!window.confirm("Are you sure you want to delete this client?")) return;
+    setDeletingClientId(id);
+    try {
+      await fetchJson(`/api/clients/${id}`, { method: "DELETE" });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete client");
+    } finally {
+      setDeletingClientId(null);
+    }
+  }
+
+  async function deleteService(id: string) {
+    if (!window.confirm("Are you sure you want to delete this service?")) return;
+    setDeletingServiceId(id);
+    try {
+      await fetchJson(`/api/services/${id}`, { method: "DELETE" });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete service");
+    } finally {
+      setDeletingServiceId(null);
+    }
+  }
+
   async function addUser(event: FormEvent) {
     event.preventDefault();
     setAddingUser(true);
@@ -174,7 +201,7 @@ export default function AdminPage() {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      setUserForm({ name: "", role: "staff", email: "", password: "" });
+      setUserForm({ name: "", role: "employee", email: "", password: "" });
       setLastCreatedCredentials(result.credentials);
       await loadAll();
     } catch (err) {
@@ -248,8 +275,6 @@ export default function AdminPage() {
     <AppShell
       title="Admin Controls"
       subtitle="Manage clients, services, and team role-based access"
-      role={role}
-      setRole={setRole}
     >
       {error && (
         <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
@@ -299,9 +324,19 @@ export default function AdminPage() {
               : clients.map((client) => (
                   <li
                     key={client.id}
-                    className="rounded-lg bg-slate-50 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
                   >
-                    {client.name}
+                    <span>{client.name}</span>
+                    {canManageMasterData && (
+                      <button
+                        className="text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                        onClick={() => deleteClient(client.id)}
+                        disabled={deletingClientId === client.id}
+                        title="Delete Client"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </li>
                 ))}
           </ul>
@@ -361,9 +396,19 @@ export default function AdminPage() {
               : services.map((service) => (
                   <li
                     key={service.id}
-                    className="rounded-lg bg-slate-50 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
                   >
-                    {service.name}
+                    <span className="truncate">{service.name} - {formatCurrency(service.price)}</span>
+                    {canManageMasterData && (
+                      <button
+                        className="text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                        onClick={() => deleteService(service.id)}
+                        disabled={deletingServiceId === service.id}
+                        title="Delete Service"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </li>
                 ))}
           </ul>
@@ -423,8 +468,7 @@ export default function AdminPage() {
               >
                 <option value="admin">admin</option>
                 <option value="manager">manager</option>
-                <option value="staff">staff</option>
-                <option value="viewer">viewer</option>
+                <option value="employee">employee</option>
               </select>
               <button
                 className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
@@ -499,8 +543,7 @@ export default function AdminPage() {
                         >
                           <option value="admin">admin</option>
                           <option value="manager">manager</option>
-                          <option value="staff">staff</option>
-                          <option value="viewer">viewer</option>
+                          <option value="employee">employee</option>
                         </select>
                         <button
                           className="rounded-md bg-slate-900 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"

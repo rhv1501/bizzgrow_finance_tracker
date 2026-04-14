@@ -1,35 +1,35 @@
 import { Role } from "@/lib/types";
 
 export type Permission =
-  | "read"
-  | "createTransaction"
-  | "updateTransaction"
-  | "deleteTransaction"
+  | "readCore"
+  | "manageCore"
   | "manageMasterData"
   | "manageUsers"
-  | "downloadReports";
+  | "downloadReports"
+  | "manageReimbursements"
+  | "createReimbursement";
 
 const rolePermissions: Record<Role, Permission[]> = {
   admin: [
-    "read",
-    "createTransaction",
-    "updateTransaction",
-    "deleteTransaction",
+    "readCore",
+    "manageCore",
     "manageMasterData",
     "manageUsers",
     "downloadReports",
+    "manageReimbursements",
+    "createReimbursement"
   ],
   manager: [
-    "read",
-    "createTransaction",
-    "updateTransaction",
-    "deleteTransaction",
+    "readCore",
+    "manageCore",
     "manageMasterData",
     "downloadReports",
+    "manageReimbursements",
+    "createReimbursement"
   ],
-  staff: ["read", "createTransaction", "updateTransaction"],
-  viewer: ["read"],
-  employee: ["read", "createTransaction"],
+  employee: [
+    "createReimbursement"
+  ],
 };
 
 export function hasPermission(role: Role, permission: Permission): boolean {

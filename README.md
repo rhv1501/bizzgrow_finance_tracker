@@ -1,156 +1,54 @@
 # Finance Tracker Pro
 
-Comprehensive income and expense tracker for business operations using:
+Comprehensive business income and expense tracker for BizzGrow, fully migrated to Supabase for high performance and real-time updates.
 
-- Frontend: Next.js App Router + Tailwind CSS
-- Backend: Next.js API Routes
-- Database: Google Sheets (primary) with optional in-memory mock fallback
-- Analytics: Chart.js + `react-chartjs-2`
-- Access Control: Role-based permissions (`admin`, `manager`, `staff`, `viewer`)
+## Technology Stack
+
+- **Frontend**: Next.js 16 (App Router) + Tailwind CSS v4
+- **State Management**: React Context (Global session and filters)
+- **Backend / Database**: Supabase (PostgreSQL + Auth + Storage)
+- **Real-time**: Supabase Postgres Changes
+- **Analytics**: Chart.js + `react-chartjs-2`
 
 ## Core Modules
 
-1. Dashboard (`/`)
+1. **Dashboard** (`/`): Real-time summary of total income, advance, pending payments, expenses, and net profit. Includes visual breakdown charts.
+2. **Income Tracker** (`/income`): Manage client revenue, payment status, and custom service entries. Real-time updates across all tabs.
+3. **Expense Tracker** (`/expenses`): Log operational and project costs with support for receipt attachments (Supabase Storage).
+4. **Analytics** (`/analytics`): Visualize historical performance trends, client revenue contribution, and expense categorization.
+5. **Admin Panel** (`/admin`): Manage master data (Clients/Services) and Team Member accounts.
+6. **Reports** (`/admin/reports`): Generate detailed Profit & Loss statements and chronological journals with CSV export.
+7. **Reimbursements** (`/reimbursements`): Dedicated employee portal for submitting out-of-pocket expenses.
 
-- Total income
-- Advance received
-- Pending payments
-- Total expenses
-- Profit
-- Expense charts by category and by person
+## Role-Based Access Control (RBAC)
 
-2. Income (`/income`)
+The application enforces strict permissions via Supabase Row-Level Security (RLS) and middleware:
 
-- Add income transactions
-- Payment status tracking (`Advance`, `Paid`, `To be paid`)
-- Client/service lookup
+- **Admin**: Full control over all system data, user management, and audit logs.
+- **Manager**: Access to all financial trackers and reports, but cannot manage users.
+- **Employee**: Restricted to the Reimbursements portal only. No visibility into company-level revenue or overall dashboard stats.
 
-3. Expenses (`/expenses`)
+## Setup & Deployment
 
-- Add expense transactions
-- Project and category tagging
-- Team member spend visibility
+1. **Prerequisites**: Node.js 20+, Supabase account.
+2. **Setup Supabase**: Run the migrations in `/supabase/migrations` to set up tables, roles, and RLS policies.
+3. **Environment Variables**: Configure `.env.local`:
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=your_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
+   SUPABASE_SERVICE_ROLE_KEY=your_role_key
+   ```
+4. **Install & Run**:
+   ```bash
+   npm install
+   npm run dev
+   ```
 
-4. Analytics (`/analytics`)
+## Key Architectural Highlights
 
-- Monthly income vs expense trends
-- Client revenue chart
-- Expense category mix
-- Monthly CSV report download
+- **Persistent Layouts**: Optimized `AppShell` with global `SessionProvider` ensures zero flickering between page transitions.
+- **Real-time Engine**: Changes made in one tab (e.g., adding an income entry) are reflected instantly across all other active sessions via Supabase.
+- **Security First**: Every API call and database query is validated against user roles using server-side session checks and database policies.
 
-5. Admin (`/admin`)
-
-- Manage clients and services
-- Manage users and roles (admin only)
-
-## Data Model (Sheets)
-
-The app uses these logical tables/sheets:
-
-- `Clients`: `id`, `name`, `contact`, `company`, `created_at`
-- `Services`: `id`, `name`, `price`, `created_at`
-- `Users`: `id`, `name`, `email`, `password_hash`, `must_change_password`, `role`, `created_at`
-- `Income`: `id`, `client_id`, `client_name`, `service_id`, `service_type`, `amount`, `status`, `payment_method`, `date`, `notes`, `created_at`, `updated_at`
-- `Expenses`: `id`, `date`, `item`, `project`, `paid_by`, `amount`, `category`, `notes`, `created_at`, `updated_at`
-- `AuditLogs`: `id`, `action`, `actor_email`, `actor_role`, `target_user_id`, `target_user_email`, `details`, `created_at`
-
-## Role Permissions
-
-- `admin`: full control, including user/role management
-- `manager`: transactions + master data + report download
-- `staff`: read + create/update transactions
-- `viewer`: read-only
-
-## Setup
-
-1. Install dependencies
-
-```bash
-npm install
-```
-
-2. Configure environment variables
-
-```bash
-cp .env.example .env.local
-```
-
-Update `.env.local` with your Google Sheets values.
-
-3. Share your sheet with service account email
-
-- Open Google Sheet
-- Click Share
-- Add `GOOGLE_SERVICE_ACCOUNT_EMAIL` with Editor access
-
-4. Create sheet tabs with exact names
-
-- `Clients`
-- `Services`
-- `Users`
-- `Income`
-- `Expenses`
-- `AuditLogs`
-
-Headers are auto-managed by the app on first run.
-
-5. Run app
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-## First Admin Login
-
-If there are no credentialed users yet, the app bootstraps an admin account on first login:
-
-- Email: `admin@bizzgrow.com`
-- Password: `Admin@123`
-
-You can override these with env vars in `.env.local`:
-
-- `BOOTSTRAP_ADMIN_EMAIL`
-- `BOOTSTRAP_ADMIN_PASSWORD`
-
-After logging in as admin, go to `/admin` and create users with custom or auto-generated credentials.
-
-## Mock Mode
-
-If Google credentials are not set, app automatically falls back to mock mode when `MOCK_DB=true` or missing credentials.
-
-Use this for local UI development, then switch to Sheets for production.
-
-## API Endpoints
-
-- Auth
-  - `POST /api/auth/login`
-  - `POST /api/auth/logout`
-  - `GET /api/auth/me`
-  - `POST /api/auth/change-password`
-- Dashboard
-  - `GET /api/summary`
-  - `GET /api/analytics`
-- CRUD
-  - `GET|POST /api/income`
-  - `PUT|DELETE /api/income/:id`
-  - `GET|POST /api/expenses`
-  - `PUT|DELETE /api/expenses/:id`
-  - `GET|POST /api/clients`
-  - `PUT|DELETE /api/clients/:id`
-  - `GET|POST /api/services`
-  - `PUT|DELETE /api/services/:id`
-  - `GET|POST /api/users`
-  - `PUT|DELETE /api/users/:id`
-  - `POST /api/users/:id/reset-password`
-  - `GET /api/audit-logs`
-
-## Smart Suggestions You Can Add Next
-
-- Automated pending-payment reminders via WhatsApp/email integration
-- File attachments for invoices and expense bills
-- Per-project profitability analytics
-- Approval workflow for large expenses
-- GST/tax report export templates
-- Audit logs for role-sensitive actions
+---
+Built with ❤️ for BizzGrow Digital Transformation.

@@ -4,7 +4,7 @@ import { listRows } from "@/lib/db";
 import { AuditLog } from "@/lib/types";
 
 export async function GET(request: Request) {
-  const role = requirePermission(request, "manageUsers");
+  const role = await requirePermission("manageUsers");
   if (role instanceof Response) {
     return role;
   }

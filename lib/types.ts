@@ -1,4 +1,4 @@
-export type Role = "admin" | "manager" | "staff" | "viewer" | "employee";
+export type Role = "admin" | "manager" | "employee";
 
 export type PaymentStatus = "Advance" | "Paid" | "To be paid";
 
@@ -62,6 +62,7 @@ export interface Expense {
   amount: number;
   category: string;
   notes: string;
+  receipt_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -83,6 +84,21 @@ export interface AnalyticsResponse {
   expenseCategory: Array<{ category: string; amount: number }>;
 }
 
-export type TableName = "clients" | "services" | "users" | "income" | "expenses" | "audit_logs";
+export type TableName = "clients" | "services" | "users" | "income" | "expenses" | "audit_logs" | "reimbursements";
 
-export type TableRow = Client | Service | User | Income | Expense | AuditLog;
+export type TableRow = Client | Service | User | Income | Expense | AuditLog | Reimbursement;
+
+export interface Reimbursement {
+  id: string;
+  user_id: string;
+  user_name: string;
+  amount: number;
+  description: string;
+  project: string;
+  category: string;
+  date: string;
+  receipt_url?: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  updated_at: string;
+}

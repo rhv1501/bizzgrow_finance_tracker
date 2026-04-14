@@ -5,13 +5,8 @@ import { AppShell } from "@/components/AppShell";
 import { ExpenseBreakdownCharts } from "@/components/Charts";
 import { StatCard } from "@/components/StatCard";
 import { fetchJson } from "@/lib/client-utils";
-import { Role, SummaryResponse } from "@/lib/types";
-
-type SummaryApiResponse = {
-  role: Role;
-  usingMockDb: boolean;
-  summary: SummaryResponse;
-};
+import { useSession } from "@/components/SessionProvider";
+import { SummaryResponse } from "@/lib/types";
 
 const emptySummary: SummaryResponse = {
   totalIncome: 0,
@@ -24,25 +19,21 @@ const emptySummary: SummaryResponse = {
 };
 
 export default function DashboardPage() {
-  const [role, setRole] = useState<Role>("viewer");
-  const [usingMockDb, setUsingMockDb] = useState(false);
   const [summary, setSummary] = useState<SummaryResponse>(emptySummary);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingContent, setLoadingContent] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        setLoading(true);
-        const result = await fetchJson<SummaryApiResponse>("/api/summary");
-        setRole(result.role);
-        setUsingMockDb(result.usingMockDb);
+        setLoadingContent(true);
+        const result = await fetchJson<{ summary: SummaryResponse }>("/api/summary");
         setSummary(result.summary);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load summary");
       } finally {
-        setLoading(false);
+        setLoadingContent(false);
       }
     }
 
@@ -53,16 +44,7 @@ export default function DashboardPage() {
     <AppShell
       title="Business Dashboard"
       subtitle="Income, expenses, pending payments, and live profitability in one screen"
-      role={role}
-      setRole={setRole}
     >
-      {usingMockDb && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          Running in `MOCK_DB` mode. Set Google Sheets credentials in
-          `.env.local` to use production data.
-        </div>
-      )}
-
       {error && (
         <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
           <span>{error}</span>
@@ -75,7 +57,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {loading ? (
+      {loadingContent ? (
         <div className="space-y-4">
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -133,8 +115,8 @@ export default function DashboardPage() {
                 blind spots.
               </li>
               <li>
-                Use categories consistently (`Asset`, `Operations`, `Travel`,
-                `Marketing`) for cleaner analytics.
+                Use categories consistently (`Software`, `Marketing`, `Office`,
+                `Travel`) for cleaner analytics.
               </li>
               <li>
                 Review pending payments weekly and send reminders from the
@@ -142,7 +124,7 @@ export default function DashboardPage() {
               </li>
               <li>
                 Keep team roles strict: Admin full control, Manager operations,
-                Staff entries, Viewer read-only.
+                Employee reimbursements only.
               </li>
             </ul>
           </section>

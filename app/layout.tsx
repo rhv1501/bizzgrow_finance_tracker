@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
-import { SyncEngine } from "@/components/SyncEngine";
+import { SessionProvider } from "@/components/SessionProvider";
 import { GlobalFilterProvider } from "@/components/GlobalFilterProvider";
 import "./globals.css";
 
@@ -17,7 +17,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Finance Tracker Pro",
   description:
-    "Comprehensive business income and expense tracker with Google Sheets backend",
+    "Comprehensive business income and expense tracker for BizzGrow.",
 };
 
 export default function RootLayout({
@@ -30,10 +30,11 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} ${spaceGrotesk.variable} antialiased`}
       >
-        <GlobalFilterProvider>
-          <SyncEngine />
-          {children}
-        </GlobalFilterProvider>
+        <SessionProvider>
+          <GlobalFilterProvider>
+            {children}
+          </GlobalFilterProvider>
+        </SessionProvider>
       </body>
     </html>
   );

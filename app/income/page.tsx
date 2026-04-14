@@ -4,10 +4,9 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useGlobalFilter } from "@/components/GlobalFilterProvider";
 import { fetchJson, formatCurrency, formatDate } from "@/lib/client-utils";
-import { Client, Income, Role, Service } from "@/lib/types";
-import { mutateLocal } from "@/lib/dexie-utils";
-import { db } from "@/lib/dexie";
-import { useLiveQuery } from "dexie-react-hooks";
+import { Client, Income, Service } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import { useSession } from "@/components/SessionProvider";
 
 const defaultForm = {
   client_id: "",
@@ -25,21 +24,39 @@ const defaultNewClient = { name: "", contact: "", company: "" };
 const defaultNewService = { name: "", price: 0 };
 
 export default function IncomePage() {
-  const [role, setRole] = useState<Role>("viewer");
+  const { role } = useSession();
   const { month, year } = useGlobalFilter();
-  const rawRows = useLiveQuery(() => db.income.toArray()) || [];
-  const rows = useMemo(() => {
-    let filtered = rawRows;
-    if (month > 0) {
-      filtered = filtered.filter(r => new Date(r.date).getMonth() + 1 === month);
-    }
-    if (year > 0) {
-      filtered = filtered.filter(r => new Date(r.date).getFullYear() === year);
-    }
-    return filtered;
-  }, [rawRows, month, year]);
-  const clients = useLiveQuery(() => db.clients.toArray()) || [];
-  const services = useLiveQuery(() => db.services.toArray()) || [];
+  const [rawRows, setRawRows] = useState<Income[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    Promise.all([
+      supabase.from("income").select("*"),
+      supabase.from("clients").select("*"),
+      supabase.from("services").select("*")
+    ]).then(([incRes, cliRes, srvRes]) => {
+      if (incRes.data) setRawRows(incRes.data as unknown as Income[]);
+      if (cliRes.data) setClients(cliRes.data as unknown as Client[]);
+      if (srvRes.data) setServices(srvRes.data as unknown as Service[]);
+    });
+
+    const channel = supabase.channel("income-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "income" }, () => {
+        supabase.from("income").select("*").then(({ data }) => setRawRows(data as any || []));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => {
+        supabase.from("clients").select("*").then(({ data }) => setClients(data as any || []));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "services" }, () => {
+        supabase.from("services").select("*").then(({ data }) => setServices(data as any || []));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,8 +71,19 @@ export default function IncomePage() {
   const [newClient, setNewClient] = useState(defaultNewClient);
   const [newService, setNewService] = useState(defaultNewService);
 
+  const rows = useMemo(() => {
+    let filtered = rawRows;
+    if (month > 0) {
+      filtered = filtered.filter(r => new Date(r.date).getMonth() + 1 === month);
+    }
+    if (year > 0) {
+      filtered = filtered.filter(r => new Date(r.date).getFullYear() === year);
+    }
+    return filtered;
+  }, [rawRows, month, year]);
+
   const canCreate = useMemo(
-    () => ["admin", "manager", "staff"].includes(role),
+    () => ["admin", "manager"].includes(role),
     [role],
   );
   const canDelete = useMemo(() => ["admin", "manager"].includes(role), [role]);
@@ -64,32 +92,18 @@ export default function IncomePage() {
     [role],
   );
 
-  async function load() {
-    try {
-      setLoading(true);
-      const result = await fetchJson<any>("/api/auth/me").catch(() => {
-        const cached = localStorage.getItem("ft_session");
-        if (cached) return JSON.parse(cached);
-        throw new Error("Cannot verify session offline");
-      });
-      localStorage.setItem("ft_session", JSON.stringify(result));
-      setRole(result?.user?.role || "viewer");
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load session");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    load();
+    // Session is handled by provider, so we just set loading false for data
+    setLoading(false);
   }, []);
 
   function handleClientSelect(value: string) {
     if (value === "__new__") {
       setShowNewClient(true);
       setForm((prev) => ({ ...prev, client_id: "", client_name: "" }));
+    } else if (value === "__custom__") {
+      setShowNewClient(false);
+      setForm((prev) => ({ ...prev, client_id: "__custom__", client_name: "" }));
     } else {
       const client = clients.find((c) => c.id === value);
       setShowNewClient(false);
@@ -105,6 +119,9 @@ export default function IncomePage() {
     if (value === "__new__") {
       setShowNewService(true);
       setForm((prev) => ({ ...prev, service_id: "", service_type: "" }));
+    } else if (value === "__custom__") {
+      setShowNewService(false);
+      setForm((prev) => ({ ...prev, service_id: "__custom__", service_type: "" }));
     } else {
       const service = services.find((s) => s.id === value);
       setShowNewService(false);
@@ -122,7 +139,7 @@ export default function IncomePage() {
     setSavingClient(true);
     try {
       const generatedId = crypto.randomUUID();
-      await mutateLocal("clients", "CREATE", { ...newClient, id: generatedId });
+      await createClient().from("clients").insert({ ...newClient, id: generatedId });
       
       setForm((prev) => ({
         ...prev,
@@ -144,7 +161,7 @@ export default function IncomePage() {
     setSavingService(true);
     try {
       const generatedId = crypto.randomUUID();
-      await mutateLocal("services", "CREATE", { ...newService, id: generatedId });
+      await createClient().from("services").insert({ ...newService, id: generatedId });
 
       setForm((prev) => ({
         ...prev,
@@ -166,11 +183,17 @@ export default function IncomePage() {
     event.preventDefault();
     setSubmitting(true);
     try {
+      const payload = {
+        ...form,
+        client_id: form.client_id === "__custom__" || !form.client_id ? null : form.client_id,
+        service_id: form.service_id === "__custom__" || !form.service_id ? null : form.service_id,
+      };
+
       if (editingId) {
-        await mutateLocal("income", "UPDATE", form, editingId);
+        await createClient().from("income").update(payload).eq("id", editingId);
         setEditingId(null);
       } else {
-        await mutateLocal("income", "CREATE", form);
+        await createClient().from("income").insert(payload);
       }
       setForm(defaultForm);
     } catch (err) {
@@ -185,9 +208,9 @@ export default function IncomePage() {
   function startEdit(row: typeof rows[0]) {
     setEditingId(row.id);
     setForm({
-      client_id: row.client_id,
+      client_id: row.client_id || "__custom__",
       client_name: row.client_name,
-      service_id: row.service_id,
+      service_id: row.service_id || "__custom__",
       service_type: row.service_type,
       amount: row.amount,
       status: row.status as any,
@@ -206,7 +229,7 @@ export default function IncomePage() {
   async function deleteIncome(id: string) {
     setDeletingId(id);
     try {
-      await mutateLocal("income", "DELETE", {}, id);
+      await createClient().from("income").delete().eq("id", id);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to delete income entry",
@@ -220,8 +243,6 @@ export default function IncomePage() {
     <AppShell
       title="Income Tracker"
       subtitle="Track client-wise revenue, payment status, and pending collections"
-      role={role}
-      setRole={setRole}
     >
       {error && (
         <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
@@ -258,45 +279,69 @@ export default function IncomePage() {
             disabled={submitting}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
           >
-            {/* Client dropdown */}
-            <select
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={showNewClient ? "__new__" : form.client_id}
-              onChange={(e) => handleClientSelect(e.target.value)}
-              required={!showNewClient}
-            >
-              <option value="" disabled>
-                Select Client
-              </option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+            <div className="flex flex-col gap-2">
+              <select
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={showNewClient ? "__new__" : form.client_id}
+                onChange={(e) => handleClientSelect(e.target.value)}
+                required={!showNewClient && form.client_id !== "__custom__"}
+              >
+                <option value="" disabled>
+                  Select Client
                 </option>
-              ))}
-              {canManageMasterData && (
-                <option value="__new__">+ Add new client…</option>
-              )}
-            </select>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value="__custom__">✎ Custom (One-off)</option>
+                {canManageMasterData && (
+                  <option value="__new__">+ Add to master catalog…</option>
+                )}
+              </select>
 
-            {/* Service dropdown */}
-            <select
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={showNewService ? "__new__" : form.service_id}
-              onChange={(e) => handleServiceSelect(e.target.value)}
-              required={!showNewService}
-            >
-              <option value="" disabled>
-                Select Service
-              </option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              {canManageMasterData && (
-                <option value="__new__">+ Add new service…</option>
+              {form.client_id === "__custom__" && !showNewClient && (
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Custom client name"
+                  value={form.client_name}
+                  onChange={(e) => setForm(prev => ({ ...prev, client_name: e.target.value }))}
+                  required
+                />
               )}
-            </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <select
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={showNewService ? "__new__" : form.service_id}
+                onChange={(e) => handleServiceSelect(e.target.value)}
+                required={!showNewService && form.service_id !== "__custom__"}
+              >
+                <option value="" disabled>
+                  Select Service
+                </option>
+                {services.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} - {formatCurrency(s.price)}
+                  </option>
+                ))}
+                <option value="__custom__">✎ Custom (One-off)</option>
+                {canManageMasterData && (
+                  <option value="__new__">+ Add to master catalog…</option>
+                )}
+              </select>
+
+              {form.service_id === "__custom__" && !showNewService && (
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Custom service name"
+                  value={form.service_type}
+                  onChange={(e) => setForm(prev => ({ ...prev, service_type: e.target.value }))}
+                  required
+                />
+              )}
+            </div>
 
             <input
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -359,7 +404,6 @@ export default function IncomePage() {
             />
           </fieldset>
 
-          {/* Inline new client form */}
           {showNewClient && (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
               <p className="mb-2 text-xs font-semibold text-amber-800">
@@ -421,7 +465,6 @@ export default function IncomePage() {
             </div>
           )}
 
-          {/* Inline new service form */}
           {showNewService && (
             <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
               <p className="mb-2 text-xs font-semibold text-blue-800">

@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/auth";
 import { Client } from "@/lib/types";
 
 export async function GET(request: Request) {
-  const role = requirePermission(request, "read");
+  const role = await requirePermission("readCore");
   if (role instanceof Response) {
     return role;
   }
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const role = requirePermission(request, "manageMasterData");
+  const role = await requirePermission("manageMasterData");
   if (role instanceof Response) {
     return role;
   }

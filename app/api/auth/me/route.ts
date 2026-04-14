@@ -1,14 +1,16 @@
 import { ok, fail } from "@/lib/api";
-import { getSessionFromRequest, isPasswordChangeRequired } from "@/lib/auth";
+import { getSession, isPasswordChangeRequired } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
+  const session = await getSession();
   if (!session) {
     return fail("Authentication required", 401);
   }
 
+  const requiresPasswordChange = await isPasswordChangeRequired();
+
   return ok({
-    requiresPasswordChange: isPasswordChangeRequired(request),
+    requiresPasswordChange,
     user: {
       id: session.userId,
       name: session.name,

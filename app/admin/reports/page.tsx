@@ -3,24 +3,45 @@
 import { useMemo, useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useGlobalFilter } from "@/components/GlobalFilterProvider";
-import { db } from "@/lib/dexie";
-import { useLiveQuery } from "dexie-react-hooks";
+import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, fetchJson } from "@/lib/client-utils";
-import { Role } from "@/lib/types";
+import { useSession } from "@/components/SessionProvider";
 
 export default function ReportsPage() {
-  const [role, setRole] = useState<Role>("viewer");
+  const { role, loading: sessionLoading } = useSession();
   const { month, year } = useGlobalFilter();
 
-  useEffect(() => {
-    fetchJson<any>("/api/auth/me").then(res => setRole(res?.user?.role || "viewer")).catch(() => {
-      const cached = localStorage.getItem("ft_session");
-      if (cached) setRole(JSON.parse(cached)?.user?.role || "viewer");
-    });
-  }, []);
+  const [rawIncome, setRawIncome] = useState<any[]>([]);
+  const [rawExpenses, setRawExpenses] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
-  const rawIncome = useLiveQuery(() => db.income.toArray()) || [];
-  const rawExpenses = useLiveQuery(() => db.expenses.toArray()) || [];
+  useEffect(() => {
+    const supabase = createClient();
+    setDataLoading(true);
+    Promise.all([
+      supabase.from("income").select("*"),
+      supabase.from("expenses").select("*")
+    ]).then(([incRes, expRes]) => {
+      if (incRes.data) setRawIncome(incRes.data);
+      if (expRes.data) setRawExpenses(expRes.data);
+      setDataLoading(false);
+    });
+
+    const channel = supabase.channel("reports")
+      .on("postgres_changes", { event: "*", schema: "public", table: "income" }, () => {
+        supabase.from("income").select("*").then(({ data }) => {
+          if (data) setRawIncome(data);
+        });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => {
+        supabase.from("expenses").select("*").then(({ data }) => {
+          if (data) setRawExpenses(data);
+        });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const { income, expenses, journal } = useMemo(() => {
     let inc = rawIncome;
@@ -36,8 +57,8 @@ export default function ReportsPage() {
     }
 
     const merged = [
-      ...inc.map(i => ({ ...i, type: "Income" as const, ref: i.client_name + " - " + i.service_type })),
-      ...exp.map(e => ({ ...e, type: "Expense" as const, ref: e.item + " (" + e.category + ")" }))
+      ...inc.map(i => ({ ...i, type: "Income" as const, ref: (i.client_name || 'Missing Client') + " - " + (i.service_type || 'Unknown Service') })),
+      ...exp.map(e => ({ ...e, type: "Expense" as const, ref: (e.item || 'Missing Item') + " (" + (e.category || 'Unknown Category') + ")" }))
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return { income: inc, expenses: exp, journal: merged };
@@ -63,16 +84,16 @@ export default function ReportsPage() {
     document.body.removeChild(a);
   }
 
-  if (role !== "admin" && role !== "manager") {
+  if (!sessionLoading && role !== "admin" && role !== "manager") {
     return (
-      <AppShell title="Reports" subtitle="Access Denied" role={role} setRole={setRole}>
+      <AppShell title="Reports" subtitle="Access Denied">
         <div className="p-6 text-center text-slate-500">You do not have permission to view reports.</div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Financial Reports" subtitle="P&L, Journal, and Balance Sheet" role={role} setRole={setRole}>
+    <AppShell title="Financial Reports" subtitle="P&L, Journal, and Balance Sheet">
       <div className="mb-6 flex justify-end">
         <button 
           onClick={exportCSV}
@@ -86,43 +107,59 @@ export default function ReportsPage() {
         {/* P&L Statement */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-bold text-slate-800">Profit & Loss Statement</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between border-b border-slate-100 pb-2">
-              <span className="text-slate-600">Total Income</span>
-              <span className="font-medium text-slate-900">{formatCurrency(totalIncome)}</span>
+          {dataLoading ? (
+            <div className="space-y-4 animate-pulse">
+                <div className="h-4 bg-slate-100 rounded w-full"></div>
+                <div className="h-4 bg-slate-100 rounded w-full"></div>
+                <div className="h-6 bg-slate-100 rounded w-1/2"></div>
             </div>
-            <div className="flex justify-between border-b border-slate-100 pb-2">
-              <span className="text-slate-600">Total Expenses</span>
-              <span className="font-medium text-rose-600">-{formatCurrency(totalExpenses)}</span>
+          ) : (
+            <div className="space-y-3 text-sm">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Total Income</span>
+                <span className="font-medium text-slate-900">{formatCurrency(totalIncome)}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Total Expenses</span>
+                <span className="font-medium text-rose-600">-{formatCurrency(totalExpenses)}</span>
+                </div>
+                <div className="flex justify-between pt-2 text-base font-bold">
+                <span>Net Profit</span>
+                <span className={profit >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                    {formatCurrency(profit)}
+                </span>
+                </div>
             </div>
-            <div className="flex justify-between pt-2 text-base font-bold">
-              <span>Net Profit</span>
-              <span className={profit >= 0 ? "text-emerald-600" : "text-rose-600"}>
-                {formatCurrency(profit)}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Balance Sheet Summary */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-bold text-slate-800">Balance Sheet Summary</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between border-b border-slate-100 pb-2">
-              <span className="text-slate-600">Accounts Receivable (Pending)</span>
-              <span className="font-medium text-slate-900">{formatCurrency(pendingPayments)}</span>
+          {dataLoading ? (
+            <div className="space-y-4 animate-pulse">
+                <div className="h-4 bg-slate-100 rounded w-full"></div>
+                <div className="h-4 bg-slate-100 rounded w-full"></div>
+                <div className="h-6 bg-slate-100 rounded w-1/2"></div>
             </div>
-            <div className="flex justify-between border-b border-slate-100 pb-2">
-              <span className="text-slate-600">Liabilities (Advance Received)</span>
-              <span className="font-medium text-amber-600">{formatCurrency(advanceReceived)}</span>
+          ) : (
+            <div className="space-y-3 text-sm">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Accounts Receivable (Pending)</span>
+                <span className="font-medium text-slate-900">{formatCurrency(pendingPayments)}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-slate-600">Liabilities (Advance Received)</span>
+                <span className="font-medium text-amber-600">{formatCurrency(advanceReceived)}</span>
+                </div>
+                <div className="flex justify-between pt-2 font-medium">
+                <span className="text-slate-600">Retained Earnings (Profit)</span>
+                <span className={profit >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                    {formatCurrency(profit)}
+                </span>
+                </div>
             </div>
-            <div className="flex justify-between pt-2 font-medium">
-              <span className="text-slate-600">Retained Earnings (Profit)</span>
-              <span className={profit >= 0 ? "text-emerald-600" : "text-rose-600"}>
-                {formatCurrency(profit)}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -143,7 +180,13 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {journal.length === 0 ? (
+              {dataLoading ? (
+                 Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-t border-slate-100 animate-pulse">
+                         <td colSpan={5} className="px-6 py-4"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
+                    </tr>
+                 ))
+              ) : journal.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No transactions found for this period.</td>
                 </tr>

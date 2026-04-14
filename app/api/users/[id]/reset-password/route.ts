@@ -1,17 +1,18 @@
 import { fail, ok } from "@/lib/api";
-import { getSessionFromRequest, requirePermission } from "@/lib/auth";
+import { getSession, requirePermission } from "@/lib/auth";
 import { listRows, updateRow } from "@/lib/db";
 import { User } from "@/lib/types";
-import { generatePassword, hashPassword } from "@/lib/security";
+import { generatePassword } from "@/lib/security";
+import { createAdminClient } from "@/lib/supabase/server";
 import { logAuditEvent } from "@/lib/audit";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const role = requirePermission(request, "manageUsers");
+  const role = await requirePermission("manageUsers");
   if (role instanceof Response) {
     return role;
   }
 
-  const session = getSessionFromRequest(request);
+  const session = await getSession();
   if (!session) {
     return fail("Authentication required", 401);
   }
@@ -24,8 +25,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   const password = generatePassword();
+  
+  const adminClient = createAdminClient();
+  const { error: authError } = await adminClient.auth.admin.updateUserById(id, { password });
+  if (authError) {
+    return fail(`Failed to update password in Auth: ${authError.message}`, 400);
+  }
+
   const updated = await updateRow<User>("users", id, {
-    password_hash: hashPassword(password),
     must_change_password: true,
   });
 

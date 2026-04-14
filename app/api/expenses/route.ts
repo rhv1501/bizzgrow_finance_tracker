@@ -1,18 +1,18 @@
 import { fail, ok, parseZodError } from "@/lib/api";
 import { createExpenseSchema } from "@/lib/schemas";
 import { createRow, listRows } from "@/lib/db";
-import { requirePermission, getSessionFromRequest } from "@/lib/auth";
+import { requirePermission, getSession } from "@/lib/auth";
 import { Expense, Role } from "@/lib/types";
 
 
 
 export async function GET(request: Request) {
-  const session = getSessionFromRequest(request);
+  const session = await getSession();
   if (!session) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
-  const role = requirePermission(request, "read");
+  const role = await requirePermission("readCore");
   if (role instanceof Response) {
     return role;
   }
@@ -28,12 +28,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = getSessionFromRequest(request);
+  const session = await getSession();
   if (!session) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
-  const role = requirePermission(request, "createTransaction");
+  const role = await requirePermission("manageCore");
   if (role instanceof Response) {
     return role;
   }

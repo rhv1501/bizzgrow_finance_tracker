@@ -13,7 +13,7 @@ export const createServiceSchema = z.object({
 
 export const createUserSchema = z.object({
   name: z.string().min(2),
-  role: z.enum(["admin", "manager", "staff", "viewer", "employee"]),
+  role: z.enum(["admin", "manager", "employee"]),
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
 });
@@ -47,7 +47,7 @@ export const updateServiceSchema = createServiceSchema.partial();
 export const updateUserSchema = z
   .object({
     name: z.string().min(2).optional(),
-    role: z.enum(["admin", "manager", "staff", "viewer", "employee"]).optional(),
+    role: z.enum(["admin", "manager", "employee"]).optional(),
     email: z.string().email().optional(),
     password: z.string().min(8).optional(),
   })
