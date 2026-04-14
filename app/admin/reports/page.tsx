@@ -94,19 +94,23 @@ export default function ReportsPage() {
 
   return (
     <AppShell title="Financial Reports" subtitle="P&L, Journal, and Balance Sheet">
-      <div className="mb-6 flex justify-end">
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <h2 className="text-xl font-bold text-foreground">Financial Statements</h2>
         <button 
           onClick={exportCSV}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+          className="w-full sm:w-auto rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 transition-all active:scale-95 flex items-center justify-center gap-2"
         >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
           Download CSV
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         {/* P&L Statement */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-bold text-slate-800">Profit & Loss Statement</h2>
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-foreground">Profit & Loss Statement</h2>
           {dataLoading ? (
             <div className="space-y-4 animate-pulse">
                 <div className="h-4 bg-slate-100 rounded w-full"></div>
@@ -115,17 +119,17 @@ export default function ReportsPage() {
             </div>
           ) : (
             <div className="space-y-3 text-sm">
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-600">Total Income</span>
-                <span className="font-medium text-slate-900">{formatCurrency(totalIncome)}</span>
+                <div className="flex justify-between border-b border-border/50 pb-2">
+                <span className="text-muted-foreground">Total Income</span>
+                <span className="font-medium text-foreground">{formatCurrency(totalIncome)}</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-600">Total Expenses</span>
-                <span className="font-medium text-rose-600">-{formatCurrency(totalExpenses)}</span>
+                <div className="flex justify-between border-b border-border/50 pb-2">
+                <span className="text-muted-foreground">Total Expenses</span>
+                <span className="font-medium text-rose-600 dark:text-rose-400">-{formatCurrency(totalExpenses)}</span>
                 </div>
                 <div className="flex justify-between pt-2 text-base font-bold">
-                <span>Net Profit</span>
-                <span className={profit >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                <span className="text-foreground">Net Profit</span>
+                <span className={profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
                     {formatCurrency(profit)}
                 </span>
                 </div>
@@ -134,8 +138,8 @@ export default function ReportsPage() {
         </div>
 
         {/* Balance Sheet Summary */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-bold text-slate-800">Balance Sheet Summary</h2>
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-foreground">Balance Sheet Summary</h2>
           {dataLoading ? (
             <div className="space-y-4 animate-pulse">
                 <div className="h-4 bg-slate-100 rounded w-full"></div>
@@ -144,17 +148,17 @@ export default function ReportsPage() {
             </div>
           ) : (
             <div className="space-y-3 text-sm">
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-600">Accounts Receivable (Pending)</span>
-                <span className="font-medium text-slate-900">{formatCurrency(pendingPayments)}</span>
+                <div className="flex justify-between border-b border-border/50 pb-2">
+                <span className="text-muted-foreground font-medium">Accounts Receivable (Pending)</span>
+                <span className="font-bold text-foreground">{formatCurrency(pendingPayments)}</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-600">Liabilities (Advance Received)</span>
-                <span className="font-medium text-amber-600">{formatCurrency(advanceReceived)}</span>
+                <div className="flex justify-between border-b border-border/50 pb-2">
+                <span className="text-muted-foreground font-medium">Liabilities (Advance Received)</span>
+                <span className="font-bold text-amber-600 dark:text-amber-400">{formatCurrency(advanceReceived)}</span>
                 </div>
                 <div className="flex justify-between pt-2 font-medium">
-                <span className="text-slate-600">Retained Earnings (Profit)</span>
-                <span className={profit >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                <span className="text-muted-foreground font-medium">Retained Earnings (Profit)</span>
+                <span className={profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
                     {formatCurrency(profit)}
                 </span>
                 </div>
@@ -164,43 +168,43 @@ export default function ReportsPage() {
       </div>
 
       {/* Journal */}
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">Chronological Journal</h2>
+      <div className="mt-6 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-border">
+          <h2 className="text-lg font-bold text-foreground">Chronological Journal</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <table className="w-full text-sm min-w-[700px]">
+            <thead className="bg-muted text-left text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border">
               <tr>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Type</th>
-                <th className="px-6 py-3">Reference</th>
-                <th className="px-6 py-3 text-right">Debit / Out</th>
-                <th className="px-6 py-3 text-right">Credit / In</th>
+                <th className="px-6 py-4">Date</th>
+                <th className="px-6 py-4">Type</th>
+                <th className="px-6 py-4">Reference</th>
+                <th className="px-6 py-4 text-right">Debit / Out</th>
+                <th className="px-6 py-4 text-right">Credit / In</th>
               </tr>
             </thead>
             <tbody>
               {dataLoading ? (
                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-t border-slate-100 animate-pulse">
-                         <td colSpan={5} className="px-6 py-4"><div className="h-4 bg-slate-100 rounded w-full"></div></td>
+                    <tr key={i} className="border-t border-border animate-pulse">
+                         <td colSpan={5} className="px-6 py-4"><div className="h-4 bg-muted rounded w-3/4 mx-auto"></div></td>
                     </tr>
                  ))
               ) : journal.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No transactions found for this period.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground italic">No transactions found for this period.</td>
                 </tr>
               ) : journal.map((row, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="px-6 py-3 whitespace-nowrap">{formatDate(row.date)}</td>
-                  <td className="px-6 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${row.type === 'Income' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                <tr key={i} className="border-t border-border hover:bg-muted/30 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">{formatDate(row.date)}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide border ${row.type === 'Income' ? 'bg-emerald-50 text-emerald-800 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' : 'bg-rose-50 text-rose-800 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800'}`}>
                       {row.type}
                     </span>
                   </td>
-                  <td className="px-6 py-3">{row.ref}</td>
-                  <td className="px-6 py-3 text-right text-rose-600">{row.type === "Expense" ? formatCurrency(row.amount) : "-"}</td>
-                  <td className="px-6 py-3 text-right text-emerald-600">{row.type === "Income" ? formatCurrency(row.amount) : "-"}</td>
+                  <td className="px-6 py-4 font-bold text-foreground">{row.ref}</td>
+                  <td className="px-6 py-4 text-right font-black text-rose-600 dark:text-rose-400">{row.type === "Expense" ? formatCurrency(row.amount) : "-"}</td>
+                  <td className="px-6 py-4 text-right font-black text-emerald-600 dark:text-emerald-400">{row.type === "Income" ? formatCurrency(row.amount) : "-"}</td>
                 </tr>
               ))}
             </tbody>

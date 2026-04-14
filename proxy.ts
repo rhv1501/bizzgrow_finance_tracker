@@ -37,7 +37,12 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/api/auth");
 
-  if (!user && !isAuthRoute && !request.nextUrl.pathname.startsWith("/api/")) {
+  const isPwaAsset = 
+    request.nextUrl.pathname === "/sw.js" ||
+    request.nextUrl.pathname === "/manifest.json" ||
+    request.nextUrl.pathname === "/manifest.webmanifest";
+
+  if (!user && !isAuthRoute && !isPwaAsset && !request.nextUrl.pathname.startsWith("/api/")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -50,6 +55,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

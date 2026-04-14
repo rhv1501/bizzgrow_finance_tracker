@@ -45,12 +45,12 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <OfflineContext.Provider value={{ isOffline }}>
-      {isOffline && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-amber-950 text-[11px] font-black uppercase tracking-[0.2em] py-1 text-center shadow-md border-b border-amber-600/20">
-          Offline Mode: Read-Only Access
+      <div className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 transform ${isOffline ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+        <div className="bg-amber-500/90 dark:bg-amber-600/90 backdrop-blur-md text-amber-950 dark:text-amber-50 text-[10px] font-black uppercase tracking-[0.3em] py-1.5 text-center shadow-lg border-b border-amber-400/20">
+          Connectivity Lost: Strictly Read-Only Mode Active
         </div>
-      )}
-      <div className={isOffline ? "pt-6" : ""}>{children}</div>
+      </div>
+      <div className={`transition-all duration-500 ${isOffline ? "pt-8" : ""}`}>{children}</div>
     </OfflineContext.Provider>
   );
 }

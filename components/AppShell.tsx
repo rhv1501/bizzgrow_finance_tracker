@@ -139,10 +139,10 @@ export function AppShell({
                 <p className="font-mono text-[10px] tracking-[0.2em] text-primary">
                   FINANCE TRACKER PRO
                 </p>
-                <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">
+                <h1 className="text-xl font-black tracking-tight text-foreground sm:text-3xl lg:text-4xl">
                   {title}
                 </h1>
-                <p className="mt-1 text-sm font-medium text-muted-foreground">{subtitle}</p>
+                <p className="mt-1 text-[11px] sm:text-sm font-medium text-muted-foreground line-clamp-1 sm:line-clamp-none">{subtitle}</p>
               </div>
             </div>
 

@@ -64,10 +64,10 @@ export function ExpenseBreakdownCharts({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 min-w-0">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden">
         <h3 className="mb-4 text-base font-bold text-foreground">Expenses by Category</h3>
-        <div className="h-64 flex justify-center">
+        <div className="h-64 flex justify-center relative">
             <Doughnut
             data={{
                 labels: byCategory.map((item) => item.label),
@@ -93,9 +93,9 @@ export function ExpenseBreakdownCharts({
             />
         </div>
       </div>
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden">
         <h3 className="mb-4 text-base font-bold text-foreground">Expenses by Person</h3>
-        <div className="h-64">
+        <div className="h-64 relative">
             <Bar
             data={{
                 labels: byPerson.map((item) => item.label),
@@ -197,10 +197,10 @@ export function TrendCharts({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 min-w-0">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden">
           <h3 className="mb-4 text-base font-bold text-foreground">Client Revenue</h3>
-          <div className="h-64">
+          <div className="h-64 relative">
             <Bar
                 data={{
                 labels: (clientRevenue || []).map((row) => row.client),
@@ -218,9 +218,9 @@ export function TrendCharts({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h3 className="mb-4 text-base font-bold text-foreground text-center">Expense Mix</h3>
-          <div className="h-64 flex justify-center">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden text-center">
+          <h3 className="mb-4 text-base font-bold text-foreground">Expense Mix</h3>
+          <div className="h-64 flex justify-center relative">
             <Doughnut
                 data={{
                 labels: (expenseCategory || []).map((row) => row.category),
@@ -237,8 +237,13 @@ export function TrendCharts({
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'right' as const,
-                            labels: { color: textColor, padding: 15, usePointStyle: true, font: { size: 10 } }
+                            position: (typeof window !== 'undefined' && window.innerWidth < 768) ? 'bottom' as const : 'right' as const,
+                            labels: { 
+                                color: textColor, 
+                                padding: 15, 
+                                usePointStyle: true, 
+                                font: { size: 10, weight: 'bold' as const } 
+                            }
                         }
                     }
                 }}

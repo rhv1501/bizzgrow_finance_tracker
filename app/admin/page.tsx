@@ -584,8 +584,8 @@ export default function AdminPage() {
           <div className="bg-muted px-6 py-4 border-b border-border">
             <h3 className="text-base font-bold text-foreground">Secure System Logs</h3>
           </div>
-          <div className="p-2">
-            <ul className="divide-y divide-border">
+          <div className="overflow-x-auto">
+            <ul className="divide-y divide-border min-w-[600px]">
                 {loading
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <li
@@ -597,8 +597,8 @@ export default function AdminPage() {
                     ))
                 : auditLogs.slice(0, 15).map((entry) => (
                     <li key={entry.id} className="px-5 py-3 hover:bg-muted/30 transition-colors flex items-center gap-4 text-xs font-medium">
-                        <span className="rounded-lg bg-zinc-200 dark:bg-zinc-800 px-2 py-1 font-black uppercase text-[10px] text-slate-900 dark:text-muted-foreground w-20 text-center shrink-0">
-                            {formatDate(entry.created_at).split(' ')[0]}
+                        <span className="rounded-lg bg-zinc-200 dark:bg-zinc-800 px-2 py-1 font-black uppercase text-[10px] text-slate-900 dark:text-muted-foreground w-24 text-center shrink-0">
+                            {formatDate(entry.created_at)}
                         </span>
                         <div className="flex-1 min-w-0">
                             <span className="font-bold text-slate-900 dark:text-foreground">{entry.action}</span>
