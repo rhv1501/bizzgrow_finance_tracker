@@ -245,11 +245,11 @@ export default function IncomePage() {
       subtitle="Track client-wise revenue, payment status, and pending collections"
     >
       {error && (
-        <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+        <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-900/50 p-3 text-sm text-rose-900 dark:text-rose-200">
           <span>{error}</span>
           <button
             onClick={() => setError(null)}
-            className="ml-4 shrink-0 font-semibold hover:text-rose-700"
+            className="ml-4 shrink-0 font-bold hover:opacity-70 transition-opacity"
           >
             ✕
           </button>
@@ -259,11 +259,11 @@ export default function IncomePage() {
       {canCreate && (
         <form
           onSubmit={submitIncome}
-          className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm"
         >
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold">
-              {editingId ? "Edit Income" : "Add Income"}
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-bold text-foreground">
+              {editingId ? "Edit Income Entry" : "Add New Income"}
             </h2>
             {editingId && (
               <button
@@ -281,7 +281,7 @@ export default function IncomePage() {
           >
             <div className="flex flex-col gap-2">
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
                 value={showNewClient ? "__new__" : form.client_id}
                 onChange={(e) => handleClientSelect(e.target.value)}
                 required={!showNewClient && form.client_id !== "__custom__"}
@@ -302,7 +302,7 @@ export default function IncomePage() {
 
               {form.client_id === "__custom__" && !showNewClient && (
                 <input
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
                   placeholder="Custom client name"
                   value={form.client_name}
                   onChange={(e) => setForm(prev => ({ ...prev, client_name: e.target.value }))}
@@ -313,7 +313,7 @@ export default function IncomePage() {
 
             <div className="flex flex-col gap-2">
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
                 value={showNewService ? "__new__" : form.service_id}
                 onChange={(e) => handleServiceSelect(e.target.value)}
                 required={!showNewService && form.service_id !== "__custom__"}
@@ -334,7 +334,7 @@ export default function IncomePage() {
 
               {form.service_id === "__custom__" && !showNewService && (
                 <input
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
                   placeholder="Custom service name"
                   value={form.service_type}
                   onChange={(e) => setForm(prev => ({ ...prev, service_type: e.target.value }))}
@@ -344,7 +344,7 @@ export default function IncomePage() {
             </div>
 
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
               type="number"
               min={1}
               placeholder="Amount"
@@ -358,7 +358,7 @@ export default function IncomePage() {
               required
             />
             <select
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
               value={form.status}
               onChange={(event) =>
                 setForm((prev) => ({
@@ -375,7 +375,7 @@ export default function IncomePage() {
               <option>To be paid</option>
             </select>
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
               type="date"
               value={form.date}
               onChange={(event) =>
@@ -384,7 +384,7 @@ export default function IncomePage() {
               required
             />
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
               placeholder="Payment Method"
               value={form.payment_method}
               onChange={(event) =>
@@ -395,8 +395,8 @@ export default function IncomePage() {
               }
             />
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm lg:col-span-2"
-              placeholder="Notes"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium lg:col-span-2 focus:ring-2 focus:ring-primary outline-none transition-all"
+              placeholder="Notes and internal tags"
               value={form.notes}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, notes: event.target.value }))
@@ -526,31 +526,31 @@ export default function IncomePage() {
         </form>
       )}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-muted text-left text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border">
               <tr>
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Service</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Method</th>
-                <th className="px-4 py-3">Notes</th>
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-5 py-4">Client</th>
+                <th className="px-5 py-4">Service</th>
+                <th className="px-5 py-4">Amount</th>
+                <th className="px-5 py-4">Status</th>
+                <th className="px-5 py-4">Date</th>
+                <th className="px-5 py-4">Method</th>
+                <th className="px-5 py-4">Notes</th>
+                <th className="px-5 py-4 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr
                     key={i}
-                    className="border-t border-slate-100 animate-pulse"
+                    className="animate-pulse"
                   >
                     {Array.from({ length: 8 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-4 rounded bg-slate-200" />
+                      <td key={j} className="px-5 py-4">
+                        <div className="h-4 rounded bg-muted w-full" />
                       </td>
                     ))}
                   </tr>
@@ -558,47 +558,57 @@ export default function IncomePage() {
               ) : rows.length === 0 ? (
                 <tr>
                   <td
-                    className="px-4 py-6 text-center text-slate-500"
+                    className="px-5 py-12 text-center text-muted-foreground italic"
                     colSpan={8}
                   >
-                    No income entries yet.
+                    No income entries found for this period.
                   </td>
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3">{row.client_name}</td>
-                    <td className="px-4 py-3">{row.service_type}</td>
-                    <td className="px-4 py-3 font-semibold">
+                  <tr key={row.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-5 py-4 font-bold text-foreground">{row.client_name}</td>
+                    <td className="px-5 py-4 text-muted-foreground">{row.service_type}</td>
+                    <td className="px-5 py-4 font-black text-foreground">
                       {formatCurrency(row.amount)}
                     </td>
-                    <td className="px-4 py-3">{row.status}</td>
-                    <td className="px-4 py-3">{formatDate(row.date)}</td>
-                    <td className="px-4 py-3">{row.payment_method || "-"}</td>
-                    <td className="px-4 py-3">{row.notes || "-"}</td>
-                    <td className="px-4 py-3">
-                      {canCreate && (
-                        <button
-                          className="mr-2 rounded-md bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 disabled:opacity-40"
-                          onClick={() => startEdit(row)}
-                          disabled={deletingId === row.id || editingId === row.id}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {canDelete ? (
-                        <button
-                          className="rounded-md bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 disabled:opacity-40"
-                          onClick={() => deleteIncome(row.id)}
-                          disabled={deletingId === row.id}
-                        >
-                          {deletingId === row.id ? "Deleting…" : "Delete"}
-                        </button>
-                      ) : !canCreate && (
-                        <span className="text-xs text-slate-400">
-                          No access
+                    <td className="px-5 py-4">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                            row.status === 'Paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                            row.status === 'Advance' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
+                            'bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-400'
+                        }`}>
+                            {row.status}
                         </span>
-                      )}
+                    </td>
+                    <td className="px-5 py-4 text-muted-foreground">{formatDate(row.date)}</td>
+                    <td className="px-5 py-4 text-muted-foreground">{row.payment_method || "-"}</td>
+                    <td className="px-5 py-4 text-muted-foreground max-w-xs truncate">{row.notes || "-"}</td>
+                    <td className="px-5 py-4">
+                        <div className="flex justify-center gap-2">
+                            {canCreate && (
+                                <button
+                                className="rounded-lg bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-900/50 transition-all disabled:opacity-40"
+                                onClick={() => startEdit(row)}
+                                disabled={deletingId === row.id || editingId === row.id}
+                                >
+                                Edit
+                                </button>
+                            )}
+                            {canDelete ? (
+                                <button
+                                className="rounded-lg bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/40 border border-rose-100 dark:border-rose-900/50 transition-all disabled:opacity-40"
+                                onClick={() => deleteIncome(row.id)}
+                                disabled={deletingId === row.id}
+                                >
+                                {deletingId === row.id ? "..." : "Delete"}
+                                </button>
+                            ) : !canCreate && (
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                Read Only
+                                </span>
+                            )}
+                        </div>
                     </td>
                   </tr>
                 ))

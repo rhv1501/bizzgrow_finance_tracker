@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { ThemeToggle } from "./ThemeToggle";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Role } from "@/lib/types";
@@ -62,7 +63,7 @@ export function AppShell({
   const years = [0, currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fef3c7,#e0f2fe_35%,#f8fafc_70%)] text-slate-900 lg:flex">
+    <div className="min-h-screen bg-background text-foreground lg:flex transition-colors duration-300">
       
       {/* Mobile Sidebar Overlay */}
       <div 
@@ -70,23 +71,22 @@ export function AppShell({
         onClick={() => setIsMenuOpen(false)}
       />
 
-      {/* Mobile Sidebar / Desktop Sidenav (Optional, but user said "move tabs to sidebar in mobile") */}
-      {/* I will implement a slide-out drawer for mobile and keep the desktop header tabs for now as per plan */}
+      {/* Mobile Sidebar */}
       <aside 
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-white p-6 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-card border-r border-border p-6 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
           isMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="font-mono text-[10px] tracking-[0.2em] text-amber-700">
+            <p className="font-mono text-[10px] tracking-[0.2em] text-primary">
               FINANCE TRACKER PRO
             </p>
             <h2 className="text-xl font-bold">Navigation</h2>
           </div>
           <button 
             onClick={() => setIsMenuOpen(false)}
-            className="rounded-lg p-2 hover:bg-slate-100"
+            className="rounded-lg p-2 hover:bg-muted"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -103,8 +103,8 @@ export function AppShell({
                 href={item.href}
                 className={`rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
                   active
-                    ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-foreground text-background shadow-lg shadow-foreground/10"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {item.label}
@@ -114,20 +114,20 @@ export function AppShell({
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
-          <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">Account Role</p>
-            <p className="mt-1 text-sm font-bold text-amber-900">{roleLabel}</p>
+          <div className="rounded-2xl bg-muted p-4 border border-border">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Account Role</p>
+            <p className="mt-1 text-sm font-bold text-foreground">{roleLabel}</p>
           </div>
         </div>
       </aside>
 
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className="mb-6 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
+        <header className="mb-6 rounded-2xl border border-border bg-card/70 backdrop-blur-2xl p-5 shadow-xl shadow-slate-200/50 dark:shadow-none transition-all ring-1 ring-white/20">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
               {/* Hamburger Button */}
               <button 
-                className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 lg:hidden hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                className="rounded-xl border border-border bg-card p-2.5 text-muted-foreground lg:hidden hover:bg-muted hover:text-foreground transition-colors"
                 onClick={() => setIsMenuOpen(true)}
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,27 +136,27 @@ export function AppShell({
               </button>
               
               <div>
-                <p className="font-mono text-[10px] tracking-[0.2em] text-amber-700">
+                <p className="font-mono text-[10px] tracking-[0.2em] text-primary">
                   FINANCE TRACKER PRO
                 </p>
-                <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">
                   {title}
                 </h1>
-                <p className="mt-1 text-sm font-medium text-slate-500">{subtitle}</p>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">{subtitle}</p>
               </div>
             </div>
 
             <div className="hidden flex-col items-end gap-3 sm:flex lg:flex-row lg:items-center">
               <div className="flex gap-2 text-sm">
                 <select 
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 font-bold hover:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer"
+                  className="rounded-xl border border-border bg-card px-3 py-2 text-foreground font-bold hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer"
                   value={month} 
                   onChange={(e) => setFilter({ month: Number(e.target.value), year })}
                 >
                   {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
                 <select 
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-700 font-bold hover:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer"
+                  className="rounded-xl border border-border bg-card px-3 py-2 text-foreground font-bold hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer"
                   value={year} 
                   onChange={(e) => setFilter({ month, year: Number(e.target.value) })}
                 >
@@ -165,15 +165,16 @@ export function AppShell({
                 </select>
               </div>
               <div className="flex items-center gap-3">
-                <span className="hidden lg:inline-flex rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900 border border-amber-200">
+                <span className="hidden lg:inline-flex rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-primary border border-primary/20">
                   {roleLabel}
                 </span>
+                <ThemeToggle />
                 <button
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 shadow-sm active:scale-95"
+                  className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground hover:bg-muted hover:border-border/50 transition-all disabled:opacity-50 shadow-sm active:scale-95"
                   onClick={logout}
                   disabled={isLoggingOut}
                 >
-                  {isLoggingOut ? "Signing out..." : "Sign out"}
+                  {isLoggingOut ? "..." : "Sign out"}
                 </button>
               </div>
             </div>
@@ -183,10 +184,10 @@ export function AppShell({
           <nav className="mt-6 hidden lg:flex flex-wrap gap-2">
             {isLoadingSession ? (
               <>
-                <div className="h-10 w-24 rounded-xl bg-slate-100 animate-pulse"></div>
-                <div className="h-10 w-24 rounded-xl bg-slate-100 animate-pulse"></div>
-                <div className="h-10 w-28 rounded-xl bg-slate-100 animate-pulse"></div>
-                <div className="h-10 w-20 rounded-xl bg-slate-100 animate-pulse"></div>
+                <div className="h-10 w-24 rounded-xl bg-muted animate-pulse"></div>
+                <div className="h-10 w-24 rounded-xl bg-muted animate-pulse"></div>
+                <div className="h-10 w-28 rounded-xl bg-muted animate-pulse"></div>
+                <div className="h-10 w-20 rounded-xl bg-muted animate-pulse"></div>
               </>
             ) : (
               navItems.filter(item => item.roles.includes(role)).map((item) => {
@@ -197,8 +198,8 @@ export function AppShell({
                     href={item.href}
                     className={`rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-200 ${
                       active
-                        ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 translate-y-[-1px]"
-                        : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                        ? "bg-foreground text-background shadow-lg shadow-foreground/10 translate-y-[-1px]"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
                     {item.label}
@@ -209,21 +210,26 @@ export function AppShell({
           </nav>
           
           {/* Mobile Footer for Header Actions */}
-          <div className="mt-4 flex flex-wrap items-center gap-3 sm:hidden pt-4 border-t border-slate-100">
-              <select 
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold"
-                value={month} 
-                onChange={(e) => setFilter({ month: Number(e.target.value), year })}
-              >
-                {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-              <button
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700"
-                onClick={logout}
-                disabled={isLoggingOut}
-              >
-                Sign out
-              </button>
+          <div className="mt-4 flex items-center justify-between sm:hidden pt-4 border-t border-border">
+              <div className="flex gap-2">
+                <select 
+                    className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold"
+                    value={month} 
+                    onChange={(e) => setFilter({ month: Number(e.target.value), year })}
+                >
+                    {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <button
+                    className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground"
+                    onClick={logout}
+                    disabled={isLoggingOut}
+                >
+                    Sign out
+                </button>
+              </div>
           </div>
         </header>
         

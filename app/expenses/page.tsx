@@ -155,11 +155,11 @@ export default function ExpensesPage() {
       subtitle="Log and monitor internal operations, travel, and marketing costs"
     >
       {error && (
-        <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+        <div className="mb-4 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-900/50 p-3 text-sm text-rose-900 dark:text-rose-200">
           <span>{error}</span>
           <button
             onClick={() => setError(null)}
-            className="ml-4 shrink-0 font-semibold hover:text-rose-700"
+            className="ml-4 shrink-0 font-bold hover:opacity-70 transition-opacity"
           >
             ✕
           </button>
@@ -169,11 +169,11 @@ export default function ExpensesPage() {
       {canCreate && (
         <form
           onSubmit={submitExpense}
-          className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+          className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm"
         >
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold">
-              {editingId ? "Edit Expense" : "Add Expense"}
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-bold text-foreground">
+              {editingId ? "Edit Expense Entry" : "Add New Expense"}
             </h2>
             {editingId && (
               <button
@@ -190,7 +190,7 @@ export default function ExpensesPage() {
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
           >
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
               type="date"
               value={form.date}
               onChange={(event) =>
@@ -199,8 +199,8 @@ export default function ExpensesPage() {
               required
             />
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Item"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              placeholder="Item name / description"
               value={form.item}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, item: event.target.value }))
@@ -208,8 +208,8 @@ export default function ExpensesPage() {
               required
             />
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Project"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              placeholder="Project / Client"
               value={form.project}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, project: event.target.value }))
@@ -217,7 +217,7 @@ export default function ExpensesPage() {
             />
             
             <select
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all disabled:opacity-50"
               value={form.paid_by}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, paid_by: event.target.value }))
@@ -233,7 +233,7 @@ export default function ExpensesPage() {
             </select>
 
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
               type="number"
               min={1}
               placeholder="Amount"
@@ -247,7 +247,7 @@ export default function ExpensesPage() {
               required
             />
             <select
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all disabled:opacity-50"
               value={form.category}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, category: event.target.value }))
@@ -266,27 +266,32 @@ export default function ExpensesPage() {
               <option value="Other">Other</option>
             </select>
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm lg:col-span-1"
-              placeholder="Notes"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium lg:col-span-1 focus:ring-2 focus:ring-primary outline-none transition-all"
+              placeholder="Internal notes"
               value={form.notes}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, notes: event.target.value }))
               }
             />
             <div className="lg:col-span-1">
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) uploadFile(e.target.files[0]);
-                }}
-                disabled={uploading}
-              />
-              {uploading && <span className="text-xs text-blue-600 ml-2">Uploading...</span>}
+              <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold text-muted-foreground cursor-pointer hover:bg-muted/50 transition-all">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                {uploading ? "Uploading..." : form.receipt_url ? "Change Receipt" : "Upload Receipt"}
+                <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                    if (e.target.files?.[0]) uploadFile(e.target.files[0]);
+                    }}
+                    disabled={uploading}
+                />
+              </label>
               {form.receipt_url && !uploading && (
-                <a href={form.receipt_url} target="_blank" rel="noreferrer" className="text-xs text-emerald-600 block mt-1 hover:underline">
-                  View Attached Receipt
+                <a href={form.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-600 font-bold block mt-1 hover:underline ml-1">
+                  ✓ Receipt Attached
                 </a>
               )}
             </div>
@@ -301,32 +306,32 @@ export default function ExpensesPage() {
         </form>
       )}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+            <thead className="bg-muted text-left text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border">
               <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Item</th>
-                <th className="px-4 py-3">Project</th>
-                <th className="px-4 py-3">Paid By</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Notes</th>
-                <th className="px-4 py-3">Receipt</th>
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-5 py-4">Date</th>
+                <th className="px-5 py-4">Item</th>
+                <th className="px-5 py-4">Project</th>
+                <th className="px-5 py-4">Paid By</th>
+                <th className="px-5 py-4">Category</th>
+                <th className="px-5 py-4">Amount</th>
+                <th className="px-5 py-4">Notes</th>
+                <th className="px-5 py-4">Receipt</th>
+                <th className="px-5 py-4 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {loading && rawRows.length === 0 ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr
                     key={i}
-                    className="border-t border-slate-100 animate-pulse"
+                    className="animate-pulse"
                   >
                     {Array.from({ length: 9 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-4 rounded bg-slate-200" />
+                      <td key={j} className="px-5 py-4">
+                        <div className="h-4 rounded bg-muted w-full" />
                       </td>
                     ))}
                   </tr>
@@ -334,56 +339,66 @@ export default function ExpensesPage() {
               ) : rows.length === 0 ? (
                 <tr>
                   <td
-                    className="px-4 py-6 text-center text-slate-500"
+                    className="px-5 py-12 text-center text-muted-foreground italic"
                     colSpan={9}
                   >
-                    No expense entries yet.
+                    No expense records found for this period.
                   </td>
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3">{formatDate(row.date)}</td>
-                    <td className="px-4 py-3">{row.item}</td>
-                    <td className="px-4 py-3">{row.project}</td>
-                    <td className="px-4 py-3">{row.paid_by}</td>
-                    <td className="px-4 py-3">{row.category}</td>
-                    <td className="px-4 py-3 font-semibold">
+                  <tr key={row.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-5 py-4 text-muted-foreground">{formatDate(row.date)}</td>
+                    <td className="px-5 py-4 font-bold text-foreground">{row.item}</td>
+                    <td className="px-5 py-4 text-muted-foreground">{row.project}</td>
+                    <td className="px-5 py-4 font-medium text-foreground">{row.paid_by}</td>
+                    <td className="px-5 py-4">
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-400">
+                            {row.category}
+                        </span>
+                    </td>
+                    <td className="px-5 py-4 font-black text-rose-600 dark:text-rose-400">
                       {formatCurrency(row.amount)}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{row.notes}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4 text-muted-foreground max-w-xs truncate">{row.notes || "-"}</td>
+                    <td className="px-5 py-4">
                       {row.receipt_url ? (
-                        <a href={row.receipt_url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
+                        <a href={row.receipt_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 transition-all">
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                           View
                         </a>
                       ) : (
-                        <span className="text-xs text-slate-400">-</span>
+                        <span className="text-[10px] font-bold text-muted-foreground opacity-50">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {canCreate && (
-                        <button
-                          className="mr-2 rounded-md bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 disabled:opacity-40"
-                          onClick={() => startEdit(row)}
-                          disabled={deletingId === row.id || editingId === row.id}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {canDelete ? (
-                        <button
-                          className="rounded-md bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 disabled:opacity-40"
-                          onClick={() => deleteExpense(row.id)}
-                          disabled={deletingId === row.id}
-                        >
-                          {deletingId === row.id ? "Deleting…" : "Delete"}
-                        </button>
-                      ) : !canCreate && (
-                        <span className="text-xs text-slate-400">
-                          No access
-                        </span>
-                      )}
+                    <td className="px-5 py-4">
+                        <div className="flex justify-center gap-2">
+                            {canCreate && (
+                                <button
+                                className="rounded-lg bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-900/50 transition-all disabled:opacity-40"
+                                onClick={() => startEdit(row)}
+                                disabled={deletingId === row.id || editingId === row.id}
+                                >
+                                Edit
+                                </button>
+                            )}
+                            {canDelete ? (
+                                <button
+                                className="rounded-lg bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/40 border border-rose-100 dark:border-rose-900/50 transition-all disabled:opacity-40"
+                                onClick={() => deleteExpense(row.id)}
+                                disabled={deletingId === row.id}
+                                >
+                                {deletingId === row.id ? "..." : "Delete"}
+                                </button>
+                            ) : !canCreate && (
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                Read Only
+                                </span>
+                            )}
+                        </div>
                     </td>
                   </tr>
                 ))

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import { SessionProvider } from "@/components/SessionProvider";
 import { GlobalFilterProvider } from "@/components/GlobalFilterProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -26,15 +27,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${manrope.variable} ${spaceGrotesk.variable} antialiased`}
       >
-        <SessionProvider>
-          <GlobalFilterProvider>
-            {children}
-          </GlobalFilterProvider>
-        </SessionProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SessionProvider>
+            <GlobalFilterProvider>
+              {children}
+            </GlobalFilterProvider>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
