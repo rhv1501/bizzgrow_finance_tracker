@@ -6,6 +6,7 @@ import { fetchJson, formatCurrency, formatDate } from "@/lib/client-utils";
 import { AuditLog, Client, Role, Service, User } from "@/lib/types";
 import { useSession } from "@/components/SessionProvider";
 import { useOffline } from "@/components/OfflineProvider";
+import { motion, AnimatePresence } from "framer-motion";
 
 type ApiList<T> = { role?: Role; data: T[] };
 type CreatedUserResponse = {
@@ -97,43 +98,28 @@ export default function AdminPage() {
 
       setError(null);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load admin data",
-      );
+      setError(err instanceof Error ? err.message : "Failed to load admin data");
     } finally {
       setLoading(false);
     }
   }, [role]);
 
   useEffect(() => {
-    const drafts = Object.fromEntries(
-      users.map((user) => [user.id, user.role]),
-    ) as Record<string, Role>;
-    setRoleDrafts(drafts);
-  }, [users]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      void loadAll();
-    }, 0);
-
-    return () => clearTimeout(timer);
+    loadAll();
   }, [loadAll]);
 
-  async function addClient(event: FormEvent) {
-    event.preventDefault();
+  // Master Data Handlers
+  async function addClient(e: FormEvent) {
+    e.preventDefault();
+    if (!clientName.trim()) return;
     setAddingClient(true);
     try {
       await fetchJson("/api/clients", {
         method: "POST",
-        body: JSON.stringify({
-          name: clientName,
-          contact: "",
-          company: clientName,
-        }),
+        body: JSON.stringify({ name: clientName }),
       });
       setClientName("");
-      await loadAll();
+      loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add client");
     } finally {
@@ -141,29 +127,12 @@ export default function AdminPage() {
     }
   }
 
-  async function addService(event: FormEvent) {
-    event.preventDefault();
-    setAddingService(true);
-    try {
-      await fetchJson("/api/services", {
-        method: "POST",
-        body: JSON.stringify(serviceForm),
-      });
-      setServiceForm({ name: "", price: 0 });
-      await loadAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add service");
-    } finally {
-      setAddingService(false);
-    }
-  }
-
   async function deleteClient(id: string) {
-    if (!window.confirm("Are you sure you want to delete this client?")) return;
+    if (!confirm("Are you sure? This may affect linked income records.")) return;
     setDeletingClientId(id);
     try {
       await fetchJson(`/api/clients/${id}`, { method: "DELETE" });
-      await loadAll();
+      loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete client");
     } finally {
@@ -171,12 +140,30 @@ export default function AdminPage() {
     }
   }
 
+  async function addService(e: FormEvent) {
+    e.preventDefault();
+    if (!serviceForm.name.trim()) return;
+    setAddingService(true);
+    try {
+      await fetchJson("/api/services", {
+        method: "POST",
+        body: JSON.stringify(serviceForm),
+      });
+      setServiceForm({ name: "", price: 0 });
+      loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add service");
+    } finally {
+      setAddingService(false);
+    }
+  }
+
   async function deleteService(id: string) {
-    if (!window.confirm("Are you sure you want to delete this service?")) return;
+    if (!confirm("Are you sure?")) return;
     setDeletingServiceId(id);
     try {
       await fetchJson(`/api/services/${id}`, { method: "DELETE" });
-      await loadAll();
+      loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete service");
     } finally {
@@ -184,88 +171,76 @@ export default function AdminPage() {
     }
   }
 
-  async function addUser(event: FormEvent) {
-    event.preventDefault();
+  // User Management
+  async function createUser(e: FormEvent) {
+    e.preventDefault();
     setAddingUser(true);
     try {
-      const payload: Record<string, unknown> = {
-        name: userForm.name,
-        role: userForm.role,
-      };
-      if (userForm.email.trim()) {
-        payload.email = userForm.email.trim().toLowerCase();
-      }
-      if (userForm.password.trim()) {
-        payload.password = userForm.password;
-      }
-
-      const result = await fetchJson<CreatedUserResponse>("/api/users", {
+      const res = await fetchJson<CreatedUserResponse>("/api/users", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(userForm),
       });
       setUserForm({ name: "", role: "employee", email: "", password: "" });
-      setLastCreatedCredentials(result.credentials);
-      await loadAll();
+      setLastCreatedCredentials(res.credentials);
+      loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add user");
+      setError(err instanceof Error ? err.message : "Failed to create user");
     } finally {
       setAddingUser(false);
     }
   }
 
-  async function saveUserRole(user: User) {
-    const nextRole = roleDrafts[user.id] || user.role;
-    if (nextRole === user.role) {
-      return;
-    }
+  function handleRoleChange(userId: string, role: Role) {
+    setRoleDrafts(prev => ({ ...prev, [userId]: role }));
+  }
 
+  async function saveUserRole(user: User) {
+    const newRole = roleDrafts[user.id];
+    if (!newRole) return;
     setSavingRoleUserId(user.id);
     try {
-      await fetchJson(`/api/users/${user.id}`, {
+      await fetchJson(`/api/users/${user.id}/role`, {
         method: "PUT",
-        body: JSON.stringify({ role: nextRole }),
+        body: JSON.stringify({ role: newRole }),
       });
-      await loadAll();
+      const newDrafts = { ...roleDrafts };
+      delete newDrafts[user.id];
+      setRoleDrafts(newDrafts);
+      loadAll();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update user role",
-      );
+      setError(err instanceof Error ? err.message : "Failed to update role");
     } finally {
       setSavingRoleUserId(null);
     }
   }
 
   async function resetUserPassword(user: User) {
+    if (!confirm(`Reset password for ${user.name}?`)) return;
     setResettingPasswordUserId(user.id);
     try {
-      const result = await fetchJson<PasswordResetResponse>(
-        `/api/users/${user.id}/reset-password`,
-        {
-          method: "POST",
-        },
-      );
-      setLastCreatedCredentials({
-        email: result.data.email,
-        password: result.data.password,
-        autoGeneratedEmail: false,
-        autoGeneratedPassword: true,
+      const res = await fetchJson<PasswordResetResponse>(`/api/users/${user.id}/reset-password`, {
+        method: "POST"
       });
-      await loadAll();
+      setLastCreatedCredentials({
+        email: res.data.email,
+        password: res.data.password,
+        autoGeneratedEmail: false,
+        autoGeneratedPassword: true
+      });
+      loadAll();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to reset user password",
-      );
+      setError(err instanceof Error ? err.message : "Failed to reset password");
     } finally {
       setResettingPasswordUserId(null);
     }
   }
 
   async function deleteUser(user: User) {
-    if (!window.confirm(`Are you sure you want to delete user ${user.name}?`)) return;
+    if (!confirm(`Permanently delete user ${user.name}? This cannot be undone.`)) return;
     setDeletingUserId(user.id);
     try {
       await fetchJson(`/api/users/${user.id}`, { method: "DELETE" });
-      await loadAll();
+      loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete user");
     } finally {
@@ -273,347 +248,316 @@ export default function AdminPage() {
     }
   }
 
+  if (!canManageMasterData) {
+    return (
+      <AppShell title="Admin" subtitle="Access Denied">
+        <div className="p-6 text-center text-slate-500">You do not have permission to access the administrative panel.</div>
+      </AppShell>
+    );
+  }
+
   return (
-    <AppShell
-      title="Admin Controls"
-      subtitle="Manage clients, services, and team role-based access"
-    >
+    <AppShell title="Administrative Center" subtitle="Control system settings, users, and master data catalogs">
       {error && (
-        <div className="mb-6 flex items-start justify-between rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-900/50 p-3 text-sm text-rose-900 dark:text-rose-200">
+        <div className="mb-8 rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-900/50 p-4 text-sm text-rose-900 dark:text-rose-200 flex items-center justify-between shadow-xl">
           <span>{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="ml-4 shrink-0 font-bold hover:opacity-70 transition-opacity"
-          >
-            ✕
-          </button>
+          <button onClick={() => setError(null)} className="ml-4 font-black uppercase text-[10px] hover:opacity-70 transition-opacity">Dismiss</button>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Clients Section */}
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h3 className="text-base font-bold text-foreground">Clients</h3>
-          {canManageMasterData ? (
-            <form onSubmit={addClient} className="mt-4 flex gap-2">
-              <input
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
-                placeholder="Client name"
-                value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
-                required
-                disabled={addingClient || isOffline}
-              />
-              <button
-                className="rounded-xl bg-foreground text-background px-4 py-2 text-xs font-black uppercase disabled:opacity-50 transition-all hover:opacity-90"
-                disabled={addingClient || isOffline}
-              >
-                {addingClient ? "…" : "Add"}
-              </button>
-            </form>
-          ) : (
-            <p className="mt-3 text-xs font-black uppercase text-slate-900 dark:text-muted-foreground tracking-widest">
-              Read-only Access
-            </p>
-          )}
-          <ul className="mt-5 space-y-2">
-            {loading
-              ? Array.from({ length: 3 }).map((_, i) => (
-                  <li
-                    key={i}
-                    className="animate-pulse rounded-xl bg-muted h-10 w-full"
-                  />
-                ))
-              : clients.map((client) => (
-                  <li
-                    key={client.id}
-                    className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-2.5 group hover:border-primary/50 transition-colors"
-                  >
-                    <span className="text-sm font-medium text-foreground">{client.name}</span>
-                    {canManageMasterData && (
-                      <button
-                        className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-600 transition-all p-1"
-                        onClick={() => deleteClient(client.id)}
-                        disabled={deletingClientId === client.id}
-                      >
-                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </li>
-                ))}
-          </ul>
-        </section>
+      {lastCreatedCredentials && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-8 rounded-3xl border-2 border-emerald-500/30 bg-emerald-50/50 p-6 shadow-2xl backdrop-blur-md dark:bg-emerald-950/20"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">Account Credentials Generated</h3>
+            <button onClick={() => setLastCreatedCredentials(null)} className="text-emerald-800 dark:text-emerald-500 font-black">✕</button>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl bg-white/50 dark:bg-emerald-950/50 p-4 border border-emerald-500/10">
+              <p className="text-[10px] uppercase font-black text-emerald-600/60 mb-1">Email</p>
+              <p className="font-mono text-sm font-bold text-emerald-900 dark:text-emerald-100">{lastCreatedCredentials.email}</p>
+            </div>
+            <div className="rounded-xl bg-white/50 dark:bg-emerald-950/50 p-4 border border-emerald-500/10">
+              <p className="text-[10px] uppercase font-black text-emerald-600/60 mb-1">Temporary Password</p>
+              <p className="font-mono text-sm font-bold text-emerald-900 dark:text-emerald-100">{lastCreatedCredentials.password}</p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs font-medium text-emerald-800 dark:text-emerald-400 italic">Please share these credentials securely. The password will not be shown again.</p>
+        </motion.div>
+      )}
 
-        {/* Services Section */}
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h3 className="text-base font-bold text-foreground">Services</h3>
-          {canManageMasterData ? (
-            <form onSubmit={addService} className="mt-4 space-y-2">
-              <input
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
-                placeholder="Service name"
-                value={serviceForm.name}
-                onChange={(event) =>
-                  setServiceForm((prev) => ({
-                    ...prev,
-                    name: event.target.value,
-                  }))
-                }
-                required
-                disabled={addingService}
-              />
-              <div className="flex gap-2">
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Clients & Services */}
+        <div className="space-y-8">
+          <motion.section 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl glass-card overflow-hidden shadow-2xl"
+          >
+            <div className="glass-header px-6 py-4 flex items-center gap-2 border-b border-border/30">
+               <svg className="h-4 w-4 text-primary" fill="currentColor" viewBox="0 0 20 20"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>
+               <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Client Catalog</h3>
+            </div>
+            <div className="p-6">
+              <form onSubmit={addClient} className="flex gap-2 mb-6">
                 <input
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
-                    placeholder="Base Price"
-                    type="number"
-                    value={serviceForm.price || ""}
-                    onChange={(event) =>
-                    setServiceForm((prev) => ({
-                        ...prev,
-                        price: Number(event.target.value),
-                    }))
-                    }
-                    required
-                    disabled={addingService || isOffline}
+                  className="flex-1 rounded-xl border border-border/50 bg-background/50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                  placeholder="Official Client Name"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  disabled={addingClient || isOffline}
                 />
                 <button
-                    className="rounded-xl bg-foreground text-background px-4 py-2 text-xs font-black uppercase disabled:opacity-50 transition-all hover:opacity-90"
+                  className="glass-btn glass-btn-primary px-4 py-2"
+                  disabled={addingClient || isOffline}
+                >
+                  {addingClient ? "…" : "Add"}
+                </button>
+              </form>
+              <div className="max-h-60 overflow-y-auto pr-2 space-y-2 no-scrollbar">
+                {clients.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded-xl bg-white/30 dark:bg-white/5 p-3 border border-white/10 group transition-all hover:bg-white/50 dark:hover:bg-white/10">
+                    <span className="text-sm font-bold text-foreground">{c.name}</span>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-600 transition-all font-black text-[10px] uppercase tracking-widest"
+                      onClick={() => deleteClient(c.id)}
+                      disabled={deletingClientId === c.id || isOffline}
+                    >
+                      {deletingClientId === c.id ? "…" : "Delete"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+
+          <motion.section 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="rounded-3xl glass-card overflow-hidden shadow-2xl"
+          >
+            <div className="glass-header px-6 py-4 flex items-center gap-2 border-b border-border/30">
+               <svg className="h-4 w-4 text-primary" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
+               <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Service Catalog</h3>
+            </div>
+            <div className="p-6">
+              <form onSubmit={addService} className="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-6">
+                <input
+                    className="sm:col-span-7 rounded-xl border border-border/50 bg-background/50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                    placeholder="Service Type"
+                    value={serviceForm.name}
+                    onChange={(e) => setServiceForm(prev => ({ ...prev, name: e.target.value }))}
+                />
+                <input
+                    className="sm:col-span-3 rounded-xl border border-border/50 bg-background/50 px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                    type="number"
+                    placeholder="Price"
+                    value={serviceForm.price || ""}
+                    onChange={(e) => setServiceForm(prev => ({ ...prev, price: Number(e.target.value) }))}
+                />
+                <button
+                    className="sm:col-span-2 glass-btn glass-btn-primary px-4 py-2"
                     disabled={addingService || isOffline}
                 >
                     {addingService ? "..." : "Add"}
                 </button>
-              </div>
-            </form>
-          ) : (
-            <p className="mt-3 text-xs font-black uppercase text-slate-900 dark:text-muted-foreground tracking-widest">
-              Read-only Access
-            </p>
-          )}
-          <ul className="mt-5 space-y-2">
-            {loading
-              ? Array.from({ length: 3 }).map((_, i) => (
-                  <li
-                    key={i}
-                    className="animate-pulse rounded-xl bg-muted h-10 w-full"
-                  />
-                ))
-              : services.map((service) => (
-                  <li
-                    key={service.id}
-                    className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-2.5 group hover:border-primary/50 transition-colors"
-                  >
+              </form>
+              <div className="max-h-60 overflow-y-auto pr-2 space-y-2 no-scrollbar">
+                {services.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between rounded-xl bg-white/30 dark:bg-white/5 p-3 border border-white/10 group transition-all hover:bg-white/50 dark:hover:bg-white/10">
                     <div className="flex flex-col">
-                        <span className="text-sm font-bold text-foreground truncate max-w-[140px]">{service.name}</span>
-                        <span className="text-[10px] font-black text-muted-foreground uppercase">{formatCurrency(service.price)}</span>
+                      <span className="text-sm font-bold text-foreground">{s.name}</span>
+                      <span className="text-[10px] font-black uppercase text-primary/60">{formatCurrency(s.price)}</span>
                     </div>
-                    {canManageMasterData && (
-                      <button
-                        className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-600 transition-all p-1"
-                        onClick={() => deleteService(service.id)}
-                        disabled={deletingServiceId === service.id}
-                      >
-                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </li>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-600 transition-all font-black text-[10px] uppercase tracking-widest"
+                      onClick={() => deleteService(s.id)}
+                      disabled={deletingServiceId === s.id || isOffline}
+                    >
+                      {deletingServiceId === s.id ? "…" : "Delete"}
+                    </button>
+                  </div>
                 ))}
-          </ul>
-        </section>
-
-        {/* Team Members Section */}
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h3 className="text-base font-bold text-foreground">Team Management</h3>
-          {canManageUsers ? (
-            <form onSubmit={addUser} className="mt-4 space-y-2">
-              <input
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
-                placeholder="Full Name"
-                value={userForm.name}
-                onChange={(event) =>
-                  setUserForm((prev) => ({ ...prev, name: event.target.value }))
-                }
-                required
-                disabled={addingUser}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
-                    placeholder="Email"
-                    type="email"
-                    value={userForm.email}
-                    onChange={(event) =>
-                    setUserForm((prev) => ({
-                        ...prev,
-                        email: event.target.value,
-                    }))
-                    }
-                    disabled={addingUser}
-                />
-                <select
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold uppercase cursor-pointer focus:ring-2 focus:ring-primary outline-none transition-all"
-                    value={userForm.role}
-                    onChange={(event) =>
-                    setUserForm((prev) => ({
-                        ...prev,
-                        role: event.target.value as Role,
-                    }))
-                    }
-                    disabled={addingUser}
-                >
-                    <option value="admin">admin</option>
-                    <option value="manager">manager</option>
-                    <option value="employee">employee</option>
-                </select>
-              </div>
-              <button
-                className="w-full rounded-xl bg-foreground text-background px-4 py-3 text-xs font-black uppercase disabled:opacity-50 transition-all hover:opacity-90 shadow-md"
-                disabled={addingUser || isOffline}
-              >
-                {addingUser ? "Provisioning…" : "Create User account"}
-              </button>
-            </form>
-          ) : (
-            <p className="mt-3 text-xs font-black uppercase text-slate-900 dark:text-muted-foreground tracking-widest">
-              Restricted: Admin Only
-            </p>
-          )}
-
-          {lastCreatedCredentials && (
-            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-900/50 p-4 text-xs">
-              <p className="font-black uppercase text-emerald-800 dark:text-emerald-400 mb-2">Success: Credentials Ready</p>
-              <div className="space-y-1 font-mono text-emerald-900 dark:text-emerald-300">
-                <p><span className="opacity-50">Email:</span> {lastCreatedCredentials.email}</p>
-                <p><span className="opacity-50">Pass:</span> {lastCreatedCredentials.password}</p>
               </div>
             </div>
+          </motion.section>
+        </div>
+
+        {/* User Management */}
+        <div className="space-y-8">
+          {canManageUsers && (
+            <motion.section 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="rounded-3xl glass-card overflow-hidden shadow-2xl"
+            >
+              <div className="glass-header px-6 py-4 flex items-center gap-2 border-b border-border/30">
+                <svg className="h-4 w-4 text-primary" fill="currentColor" viewBox="0 0 20 20"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" /></svg>
+                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Identity & Access</h3>
+              </div>
+              <div className="p-6">
+                <form onSubmit={createUser} className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Name</label>
+                      <input
+                        className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                        placeholder="e.g. Rudresh Vyas"
+                        value={userForm.name}
+                        onChange={(e) => setUserForm(prev => ({ ...prev, name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">System Role</label>
+                      <select
+                        className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer backdrop-blur-sm"
+                        value={userForm.role}
+                        onChange={(e) => setUserForm(prev => ({ ...prev, role: e.target.value as Role }))}
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="employee">Employee</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Login Identity (Email or Phone)</label>
+                    <input
+                      className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                      placeholder="e.g. admin@bizzgrow.com"
+                      value={userForm.email}
+                      onChange={(e) => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                    <p className="text-[9px] text-muted-foreground mt-1 tracking-wide">Enter an email, or leave blank to generate a system identity.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Initial Password</label>
+                    <input
+                      className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                      type="password"
+                      placeholder="Leave blank to auto-generate"
+                      value={userForm.password}
+                      onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
+                    />
+                  </div>
+                  <button
+                    className="w-full glass-btn glass-btn-primary py-4 mt-2 shadow-xl"
+                    disabled={addingUser || isOffline}
+                  >
+                    {addingUser ? "Provisioning…" : "Create User account"}
+                  </button>
+                </form>
+
+                <div className="mt-8">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Total Workforce ({users.length})</h4>
+                  <ul className="space-y-3">
+                    {users.map((user) => {
+                      const roleDraft = roleDrafts[user.id];
+                      const roleDirty = roleDraft && roleDraft !== user.role;
+                      return (
+                        <li key={user.id} className="rounded-2xl border border-border/30 bg-white/40 dark:bg-white/5 p-4 transition-all hover:bg-white/60 dark:hover:bg-white/10">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                              <p className="text-sm font-black text-foreground">{user.name}</p>
+                              <p className="text-[10px] font-medium text-muted-foreground">{user.email}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <select
+                                className="rounded-lg border border-border/40 bg-background/50 px-2 py-1.5 text-[10px] font-bold outline-none cursor-pointer"
+                                value={roleDraft || user.role}
+                                onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
+                              >
+                                <option value="admin">admin</option>
+                                <option value="manager">manager</option>
+                                <option value="employee">employee</option>
+                              </select>
+                              
+                               <button
+                                 className={`glass-btn px-3 py-1.5 transition-all ${
+                                   roleDirty ? 'glass-btn-primary shadow-lg scale-105' : 'glass-btn-secondary opacity-40'
+                                 }`}
+                                 onClick={() => saveUserRole(user)}
+                                 disabled={
+                                   !roleDirty ||
+                                   savingRoleUserId === user.id ||
+                                   resettingPasswordUserId === user.id
+                                 }
+                               >
+                                 {savingRoleUserId === user.id ? "..." : "Save"}
+                               </button>
+
+                               <button
+                                 className="glass-btn glass-btn-secondary px-3 py-1.5 text-[8px] border-amber-500/20 text-amber-600 ml-auto"
+                                 onClick={() => resetUserPassword(user)}
+                                 title="Generate New Password"
+                                 disabled={
+                                   savingRoleUserId === user.id ||
+                                   resettingPasswordUserId === user.id ||
+                                   isOffline
+                                 }
+                               >
+                                 {resettingPasswordUserId === user.id ? "..." : "Reset"}
+                               </button>
+                               
+                               <button
+                                 className="glass-btn glass-btn-danger px-3 py-1.5 text-[8px]"
+                                 onClick={() => deleteUser(user)}
+                                 disabled={
+                                   savingRoleUserId === user.id ||
+                                   resettingPasswordUserId === user.id ||
+                                   deletingUserId === user.id ||
+                                   isOffline
+                                 }
+                               >
+                                 {deletingUserId === user.id ? "..." : "Delete"}
+                               </button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            </motion.section>
           )}
 
-          <ul className="mt-6 space-y-4">
-            {loading
-              ? Array.from({ length: 3 }).map((_, i) => (
-                  <li
-                    key={i}
-                    className="animate-pulse rounded-xl bg-muted h-20 w-full"
-                  />
-                ))
-              : users.map((user) => {
-                  const selectedRole = roleDrafts[user.id] || user.role;
-                  const roleDirty = selectedRole !== user.role;
-
-                  return (
-                    <li
-                      key={user.id}
-                      className="rounded-xl border border-border bg-background p-4 flex flex-col gap-3 group hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-foreground">{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
+          {role === "admin" && (
+            <motion.section 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="rounded-3xl glass-card overflow-hidden shadow-2xl"
+            >
+               <div className="glass-header px-6 py-4 flex items-center gap-2 border-b border-border/30">
+                <svg className="h-4 w-4 text-primary" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zM11 17a1 1 0 10-2 0v1a1 1 0 102 0v-1zM4.222 19.071a1 1 0 010-1.414l.707-.707a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414 0zM3.707 5.364a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414l-.707.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z" clipRule="evenodd" /></svg>
+                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Security Audit Trail</h3>
+              </div>
+              <div className="p-6">
+                <div className="max-h-96 overflow-y-auto pr-2 space-y-3 no-scrollbar">
+                  {auditLogs.map((log) => (
+                    <div key={log.id} className="rounded-xl bg-white/30 dark:bg-white/5 p-3 border border-white/10 text-[11px]">
+                      <div className="flex justify-between items-start mb-1 text-muted-foreground uppercase font-black tracking-widest text-[9px]">
+                        <span>{log.user_name}</span>
+                        <span>{formatDate(log.created_at)}</span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
-                        <select
-                          className="rounded-lg border border-border bg-muted px-2 py-1 text-[10px] font-black uppercase cursor-pointer outline-none"
-                          value={selectedRole}
-                          onChange={(event) =>
-                            setRoleDrafts((prev) => ({
-                              ...prev,
-                              [user.id]: event.target.value as Role,
-                            }))
-                          }
-                          disabled={
-                            savingRoleUserId === user.id ||
-                            resettingPasswordUserId === user.id
-                          }
-                        >
-                          <option value="admin">admin</option>
-                          <option value="manager">manager</option>
-                          <option value="employee">employee</option>
-                        </select>
-                        
-                        <button
-                          className="rounded-lg bg-foreground text-background px-3 py-1 text-[10px] font-black uppercase disabled:opacity-40 transition-all hover:scale-105"
-                          onClick={() => saveUserRole(user)}
-                          disabled={
-                            !roleDirty ||
-                            savingRoleUserId === user.id ||
-                            resettingPasswordUserId === user.id
-                          }
-                        >
-                          {savingRoleUserId === user.id ? "..." : "Save"}
-                        </button>
-
-                        <button
-                          className="rounded-lg bg-amber-200 text-amber-950 dark:bg-amber-900/40 dark:text-amber-400 px-4 py-1.5 text-xs font-black uppercase disabled:opacity-40 transition-all ml-auto hover:bg-amber-300 shadow-sm"
-                          onClick={() => resetUserPassword(user)}
-                          title="Generate New Password"
-                          disabled={
-                            savingRoleUserId === user.id ||
-                            resettingPasswordUserId === user.id ||
-                            isOffline
-                          }
-                        >
-                          {resettingPasswordUserId === user.id ? "..." : "Reset"}
-                        </button>
-                        
-                        <button
-                          className="rounded-lg bg-rose-200 text-rose-950 dark:bg-rose-950/40 dark:text-rose-400 px-4 py-1.5 text-xs font-black uppercase disabled:opacity-40 transition-all hover:bg-rose-300 shadow-sm"
-                          onClick={() => deleteUser(user)}
-                          disabled={
-                            savingRoleUserId === user.id ||
-                            resettingPasswordUserId === user.id ||
-                            deletingUserId === user.id ||
-                            isOffline
-                          }
-                        >
-                          {deletingUserId === user.id ? "..." : "Delete"}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-          </ul>
-        </section>
+                      <p className="text-foreground font-bold line-clamp-2">{log.action}</p>
+                    </div>
+                  ))}
+                  {auditLogs.length === 0 && (
+                    <p className="text-center text-muted-foreground italic py-8">No security logs recorded.</p>
+                  )}
+                </div>
+              </div>
+            </motion.section>
+          )}
+        </div>
       </div>
-
-      {canManageUsers && (
-        <section className="mt-8 rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-          <div className="bg-muted px-6 py-4 border-b border-border">
-            <h3 className="text-base font-bold text-foreground">Secure System Logs</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <ul className="divide-y divide-border min-w-[600px]">
-                {loading
-                ? Array.from({ length: 4 }).map((_, i) => (
-                    <li
-                        key={i}
-                        className="animate-pulse rounded px-4 py-4"
-                    >
-                         <div className="h-4 bg-muted rounded w-3/4"></div>
-                    </li>
-                    ))
-                : auditLogs.slice(0, 15).map((entry) => (
-                    <li key={entry.id} className="px-5 py-3 hover:bg-muted/30 transition-colors flex items-center gap-4 text-xs font-medium">
-                        <span className="rounded-lg bg-zinc-200 dark:bg-zinc-800 px-2 py-1 font-black uppercase text-[10px] text-slate-900 dark:text-muted-foreground w-24 text-center shrink-0">
-                            {formatDate(entry.created_at)}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                            <span className="font-bold text-slate-900 dark:text-foreground">{entry.action}</span>
-                            <span className="mx-2 opacity-30">|</span>
-                            <span className="text-slate-700 dark:text-muted-foreground italic truncate">{entry.details}</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-600 dark:text-muted-foreground opacity-70 shrink-0">
-                            BY {entry.actor_email}
-                        </span>
-                    </li>
-                    ))}
-            </ul>
-          </div>
-        </section>
-      )}
     </AppShell>
   );
 }

@@ -8,7 +8,11 @@ export async function GET(request: Request) {
     return role;
   }
 
-  const summary = await getSummary();
+  const { searchParams } = new URL(request.url);
+  const month = searchParams.get("month") ? Number(searchParams.get("month")) : undefined;
+  const year = searchParams.get("year") ? Number(searchParams.get("year")) : undefined;
+
+  const summary = await getSummary(month, year);
 
   return ok({
     role,

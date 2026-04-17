@@ -65,7 +65,7 @@ export function ExpenseBreakdownCharts({
 
   return (
     <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 min-w-0">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden">
+      <div className="rounded-2xl glass-card p-5 shadow-sm min-w-0 overflow-hidden">
         <h3 className="mb-4 text-base font-bold text-foreground">Expenses by Category</h3>
         <div className="h-64 flex justify-center relative">
             <Doughnut
@@ -93,7 +93,7 @@ export function ExpenseBreakdownCharts({
             />
         </div>
       </div>
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden">
+      <div className="rounded-2xl glass-card p-5 shadow-sm min-w-0 overflow-hidden">
         <h3 className="mb-4 text-base font-bold text-foreground">Expenses by Person</h3>
         <div className="h-64 relative">
             <Bar
@@ -160,7 +160,7 @@ export function TrendCharts({
 
   return (
     <div className="grid gap-4">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="rounded-2xl glass-card p-5 shadow-sm">
         <h3 className="mb-6 text-base font-bold text-foreground flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
             Monthly Income vs Expense
@@ -198,7 +198,7 @@ export function TrendCharts({
       </div>
 
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 min-w-0">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden">
+        <div className="rounded-2xl glass-card p-5 shadow-sm min-w-0 overflow-hidden">
           <h3 className="mb-4 text-base font-bold text-foreground">Client Revenue</h3>
           <div className="h-64 relative">
             <Bar
@@ -218,7 +218,7 @@ export function TrendCharts({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm min-w-0 overflow-hidden text-center">
+        <div className="rounded-2xl glass-card p-5 shadow-sm min-w-0 overflow-hidden text-center">
           <h3 className="mb-4 text-base font-bold text-foreground">Expense Mix</h3>
           <div className="h-64 flex justify-center relative">
             <Doughnut

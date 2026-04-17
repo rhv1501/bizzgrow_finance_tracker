@@ -8,6 +8,7 @@ import { Client, Income, Service } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { useSession } from "@/components/SessionProvider";
 import { useOffline } from "@/components/OfflineProvider";
+import { motion, AnimatePresence } from "framer-motion";
 
 const defaultForm = {
   client_id: "",
@@ -139,9 +140,16 @@ export default function IncomePage() {
   async function saveNewClient() {
     if (!newClient.name.trim()) return;
     setSavingClient(true);
+    const prevClients = [...clients];
+    const generatedId = crypto.randomUUID();
+    
+    // Optimistic Update
+    const tempClient = { ...newClient, id: generatedId, created_at: new Date().toISOString() };
+    setClients(prev => [...prev, tempClient]);
+
     try {
-      const generatedId = crypto.randomUUID();
-      await createClient().from("clients").insert({ ...newClient, id: generatedId });
+      const { error } = await createClient().from("clients").insert({ ...newClient, id: generatedId });
+      if (error) throw error;
       
       setForm((prev) => ({
         ...prev,
@@ -152,6 +160,7 @@ export default function IncomePage() {
       setShowNewClient(false);
       setError(null);
     } catch (err) {
+      setClients(prevClients); // Rollback
       setError(err instanceof Error ? err.message : "Failed to create client");
     } finally {
       setSavingClient(false);
@@ -161,9 +170,16 @@ export default function IncomePage() {
   async function saveNewService() {
     if (!newService.name.trim()) return;
     setSavingService(true);
+    const prevServices = [...services];
+    const generatedId = crypto.randomUUID();
+
+    // Optimistic Update
+    const tempService = { ...newService, id: generatedId, created_at: new Date().toISOString() };
+    setServices(prev => [...prev, tempService]);
+
     try {
-      const generatedId = crypto.randomUUID();
-      await createClient().from("services").insert({ ...newService, id: generatedId });
+      const { error } = await createClient().from("services").insert({ ...newService, id: generatedId });
+      if (error) throw error;
 
       setForm((prev) => ({
         ...prev,
@@ -175,6 +191,7 @@ export default function IncomePage() {
       setShowNewService(false);
       setError(null);
     } catch (err) {
+      setServices(prevServices); // Rollback
       setError(err instanceof Error ? err.message : "Failed to create service");
     } finally {
       setSavingService(false);
@@ -184,21 +201,42 @@ export default function IncomePage() {
   async function submitIncome(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
-    try {
-      const payload = {
-        ...form,
-        client_id: form.client_id === "__custom__" || !form.client_id ? null : form.client_id,
-        service_id: form.service_id === "__custom__" || !form.service_id ? null : form.service_id,
-      };
+    const prevRows = [...rawRows];
 
+    // Prepare payload
+    const payload = {
+      ...form,
+      client_id: form.client_id === "__custom__" || !form.client_id ? null : form.client_id,
+      service_id: form.service_id === "__custom__" || !form.service_id ? null : form.service_id,
+    };
+
+    // Optimistic Update
+    if (editingId) {
+      setRawRows(prev => prev.map(r => r.id === editingId ? { ...r, ...payload } as any : r));
+    } else {
+      const tempId = `temp-${crypto.randomUUID()}`;
+      const tempEntry = { 
+        ...payload, 
+        id: tempId, 
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      setRawRows(prev => [tempEntry as any, ...prev]);
+    }
+
+    try {
       if (editingId) {
-        await createClient().from("income").update(payload).eq("id", editingId);
+        const { error } = await createClient().from("income").update(payload).eq("id", editingId);
+        if (error) throw error;
         setEditingId(null);
       } else {
-        await createClient().from("income").insert(payload);
+        const { error } = await createClient().from("income").insert(payload);
+        if (error) throw error;
       }
       setForm(defaultForm);
+      setError(null);
     } catch (err) {
+      setRawRows(prevRows); // Rollback
       setError(
         err instanceof Error ? err.message : "Failed to save income entry",
       );
@@ -229,10 +267,19 @@ export default function IncomePage() {
   }
 
   async function deleteIncome(id: string) {
+    if (!confirm("Are you sure you want to delete this entry?")) return;
     setDeletingId(id);
+    const prevRows = [...rawRows];
+    
+    // Optimistic Update
+    setRawRows(prev => prev.filter(r => r.id !== id));
+
     try {
-      await createClient().from("income").delete().eq("id", id);
+      const { error } = await createClient().from("income").delete().eq("id", id);
+      if (error) throw error;
+      setError(null);
     } catch (err) {
+      setRawRows(prevRows); // Rollback
       setError(
         err instanceof Error ? err.message : "Failed to delete income entry",
       );
@@ -259,42 +306,44 @@ export default function IncomePage() {
       )}
 
       {canCreate && (
-        <form
+        <motion.form
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           onSubmit={submitIncome}
-          className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm"
+          className="mb-8 rounded-3xl glass-card p-6 shadow-2xl overflow-visible"
         >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-bold text-foreground">
-              {editingId ? "Edit Income Entry" : "Add New Income"}
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
+              <span className="h-5 w-5 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"/></svg>
+              </span>
+              {editingId ? "Edit Income Entry" : "Register Income"}
             </h2>
             {editingId && (
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="text-xs font-medium text-slate-500 hover:text-slate-800"
+                className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-rose-600 transition-colors"
               >
-                Cancel Edit
+                Cancel Edit ×
               </button>
             )}
           </div>
           <fieldset
             disabled={submitting || isOffline}
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             <div className="flex flex-col gap-2">
               <select
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+                className="rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer backdrop-blur-sm"
                 value={showNewClient ? "__new__" : form.client_id}
                 onChange={(e) => handleClientSelect(e.target.value)}
                 required={!showNewClient && form.client_id !== "__custom__"}
               >
-                <option value="" disabled>
-                  Select Client
-                </option>
+                <option value="" disabled>Select Client</option>
                 {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
                 <option value="__custom__">✎ Custom (One-off)</option>
                 {canManageMasterData && (
@@ -304,7 +353,7 @@ export default function IncomePage() {
 
               {form.client_id === "__custom__" && !showNewClient && (
                 <input
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+                  className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
                   placeholder="Custom client name"
                   value={form.client_name}
                   onChange={(e) => setForm(prev => ({ ...prev, client_name: e.target.value }))}
@@ -315,14 +364,12 @@ export default function IncomePage() {
 
             <div className="flex flex-col gap-2">
               <select
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+                className="rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer backdrop-blur-sm"
                 value={showNewService ? "__new__" : form.service_id}
                 onChange={(e) => handleServiceSelect(e.target.value)}
                 required={!showNewService && form.service_id !== "__custom__"}
               >
-                <option value="" disabled>
-                  Select Service
-                </option>
+                <option value="" disabled>Select Service</option>
                 {services.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} - {formatCurrency(s.price)}
@@ -336,7 +383,7 @@ export default function IncomePage() {
 
               {form.service_id === "__custom__" && !showNewService && (
                 <input
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+                  className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
                   placeholder="Custom service name"
                   value={form.service_type}
                   onChange={(e) => setForm(prev => ({ ...prev, service_type: e.target.value }))}
@@ -346,7 +393,7 @@ export default function IncomePage() {
             </div>
 
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
               type="number"
               min={1}
               placeholder="Amount"
@@ -360,15 +407,12 @@ export default function IncomePage() {
               required
             />
             <select
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer backdrop-blur-sm"
               value={form.status}
               onChange={(event) =>
                 setForm((prev) => ({
                   ...prev,
-                  status: event.target.value as
-                    | "Advance"
-                    | "Paid"
-                    | "To be paid",
+                  status: event.target.value as any,
                 }))
               }
             >
@@ -377,7 +421,7 @@ export default function IncomePage() {
               <option>To be paid</option>
             </select>
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
               type="date"
               value={form.date}
               onChange={(event) =>
@@ -386,18 +430,15 @@ export default function IncomePage() {
               required
             />
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
               placeholder="Payment Method"
               value={form.payment_method}
               onChange={(event) =>
-                setForm((prev) => ({
-                  ...prev,
-                  payment_method: event.target.value,
-                }))
+                setForm((prev) => ({ ...prev, payment_method: event.target.value }))
               }
             />
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium lg:col-span-2 focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold lg:col-span-2 focus:ring-2 focus:ring-primary outline-none transition-all"
               placeholder="Notes and internal tags"
               value={form.notes}
               onChange={(event) =>
@@ -448,7 +489,7 @@ export default function IncomePage() {
                   type="button"
                   onClick={saveNewClient}
                   disabled={savingClient || !newClient.name.trim()}
-                  className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  className="glass-btn glass-btn-primary px-3 py-1.5 text-[10px]"
                 >
                   {savingClient ? "Saving…" : "Save Client"}
                 </button>
@@ -459,7 +500,7 @@ export default function IncomePage() {
                     setNewClient(defaultNewClient);
                   }}
                   disabled={savingClient}
-                  className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                  className="glass-btn glass-btn-secondary px-3 py-1.5 text-[10px]"
                 >
                   Cancel
                 </button>
@@ -499,7 +540,7 @@ export default function IncomePage() {
                   type="button"
                   onClick={saveNewService}
                   disabled={savingService || !newService.name.trim()}
-                  className="rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  className="glass-btn glass-btn-primary px-3 py-1.5 text-[10px]"
                 >
                   {savingService ? "Saving…" : "Save Service"}
                 </button>
@@ -510,7 +551,7 @@ export default function IncomePage() {
                     setNewService(defaultNewService);
                   }}
                   disabled={savingService}
-                  className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                  className="glass-btn glass-btn-secondary px-3 py-1.5 text-[10px]"
                 >
                   Cancel
                 </button>
@@ -519,31 +560,31 @@ export default function IncomePage() {
           )}
 
           <button
-            className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="mt-6 glass-btn glass-btn-primary w-full sm:w-auto"
             type="submit"
             disabled={submitting || showNewClient || showNewService}
           >
-            {submitting ? "Saving…" : editingId ? "Update Income" : "Add Income"}
+            {submitting ? "Processing…" : editingId ? "Update Transaction" : "Save Transaction"}
           </button>
-        </form>
+        </motion.form>
       )}
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <section className="overflow-hidden rounded-3xl glass-card shadow-2xl transition-all duration-500 hover:shadow-primary/5">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-muted text-left text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border">
+            <thead className="text-left text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border/50">
               <tr>
-                <th className="px-5 py-4">Client</th>
-                <th className="px-5 py-4">Service</th>
-                <th className="px-5 py-4">Amount</th>
-                <th className="px-5 py-4">Status</th>
-                <th className="px-5 py-4">Date</th>
-                <th className="px-5 py-4">Method</th>
-                <th className="px-5 py-4">Notes</th>
-                <th className="px-5 py-4 text-center">Actions</th>
+                <th className="px-6 py-5">Client</th>
+                <th className="px-6 py-5">Service</th>
+                <th className="px-6 py-5">Amount</th>
+                <th className="px-6 py-5">Status</th>
+                <th className="px-6 py-5">Date</th>
+                <th className="px-6 py-5">Method</th>
+                <th className="px-6 py-5 font-bold">Notes</th>
+                <th className="px-6 py-5 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/30">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr
@@ -575,10 +616,10 @@ export default function IncomePage() {
                       {formatCurrency(row.amount)}
                     </td>
                     <td className="px-5 py-4">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                            row.status === 'Paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                            row.status === 'Advance' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                            'bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-400'
+                        <span className={`glass-badge ${
+                            row.status === 'Paid' ? 'glass-badge-success' :
+                            row.status === 'Advance' ? 'glass-badge-warning' :
+                            'glass-badge-neutral'
                         }`}>
                             {row.status}
                         </span>
@@ -590,7 +631,7 @@ export default function IncomePage() {
                         <div className="flex justify-center gap-2">
                             {canCreate && (
                                 <button
-                                className="rounded-lg bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-900/50 transition-all disabled:opacity-40"
+                                className="glass-btn glass-btn-secondary px-3 py-1.5 text-[8px]"
                                 onClick={() => startEdit(row)}
                                 disabled={deletingId === row.id || editingId === row.id}
                                 >
@@ -599,7 +640,7 @@ export default function IncomePage() {
                             )}
                             {canDelete ? (
                                 <button
-                                className="rounded-lg bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/40 border border-rose-100 dark:border-rose-900/50 transition-all disabled:opacity-40"
+                                className="glass-btn glass-btn-danger px-3 py-1.5 text-[8px]"
                                 onClick={() => deleteIncome(row.id)}
                                 disabled={deletingId === row.id}
                                 >

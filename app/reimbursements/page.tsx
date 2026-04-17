@@ -1,100 +1,80 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import { AppShell } from "@/components/AppShell";
 import { fetchJson, formatCurrency, formatDate } from "@/lib/client-utils";
 import { Reimbursement, Client } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { useSession } from "@/components/SessionProvider";
 import { useOffline } from "@/components/OfflineProvider";
+import { motion, AnimatePresence } from "framer-motion";
 
-const EXPENSE_CATEGORIES = [
-  "Software Subscriptions",
-  "Marketing & Advertising",
-  "Office & Equipment",
-  "Travel & Logistics",
-  "Payroll & Contracting",
+const CATEGORIES = [
+  "Travel",
+  "Food",
+  "Software",
+  "Marketing",
+  "Equipment",
   "Operations",
-  "Legal & Compliance",
-  "Reimbursement",
   "Other"
 ];
 
 export default function ReimbursementsPage() {
   const { role, user } = useSession();
   const { isOffline } = useOffline();
-  const [items, setItems] = useState<Reimbursement[]>([]);
+  const [requests, setRequests] = useState<Reimbursement[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [project, setProject] = useState("Internal");
-  const [customProject, setCustomProject] = useState("");
-  const [category, setCategory] = useState("Operations");
-  const [receiptUrl, setReceiptUrl] = useState("");
+  const [form, setForm] = useState({
+    amount: 0,
+    category: "Travel",
+    description: "",
+    project: "Internal",
+    customProject: "",
+    receipt_url: ""
+  });
 
+  const canApprove = role === "admin" || role === "manager";
   const supabase = createClient();
 
   useEffect(() => {
-    fetchData();
+    async function load() {
+      setLoading(true);
+      try {
+        const [reqRes, cliRes] = await Promise.all([
+          supabase.from("reimbursements").select("*").order("created_at", { ascending: false }),
+          supabase.from("clients").select("*").order("name", { ascending: true })
+        ]);
+        if (reqRes.data) setRequests(reqRes.data as Reimbursement[]);
+        if (cliRes.data) setClients(cliRes.data as Client[]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
 
-    // Listen for realtime updates
-    const channel = supabase
-      .channel("reimbursements_changes_v4")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "reimbursements" },
-        () => {
-          fetchReimbursements();
-        }
-      )
+    const channel = supabase.channel("reimbursements_realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "reimbursements" }, () => {
+        supabase.from("reimbursements").select("*").order("created_at", { ascending: false })
+          .then(({ data }) => { if (data) setRequests(data as Reimbursement[]); });
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+    return () => { supabase.removeChannel(channel); };
+  }, [supabase]);
 
-  async function fetchData() {
-    setLoading(true);
-    await Promise.all([fetchReimbursements(), fetchClients()]);
-    setLoading(false);
-  }
-
-  async function fetchReimbursements() {
-    const { data, error } = await supabase
-      .from("reimbursements")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setItems(data as Reimbursement[]);
-    }
-  }
-
-  async function fetchClients() {
-    const { data, error } = await supabase
-      .from("clients")
-      .select("*")
-      .order("name", { ascending: true });
-
-    if (!error && data) {
-      setClients(data as Client[]);
-    }
-  }
-
-  async function uploadFile(e: React.ChangeEvent<HTMLInputElement>) {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${crypto.randomUUID()}.${fileExt}`;
-
+  async function uploadFile(file: File) {
+    setUploading(true);
+    setError(null);
     try {
-      setSubmitting(true);
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
       const { data, error: uploadError } = await supabase.storage
         .from("receipts")
         .upload(fileName, file);
@@ -105,69 +85,84 @@ export default function ReimbursementsPage() {
         .from("receipts")
         .getPublicUrl(data.path);
 
-      setReceiptUrl(publicUrlData.publicUrl);
+      setForm(prev => ({ ...prev, receipt_url: publicUrlData.publicUrl }));
     } catch (err: any) {
-      setError(err.message || "Failed to upload file");
+      setError(err.message || "Upload failed");
     } finally {
-      setSubmitting(false);
+      setUploading(false);
     }
   }
 
-  function handleProjectChange(value: string) {
-    setProject(value);
-    if (value !== "__custom__") {
-      setCustomProject("");
-    }
-  }
-
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    if (!user) return;
+    
     setSubmitting(true);
+    setError(null);
+    const prevRequests = [...requests];
+
+    const finalProject = form.project === "__custom__" ? form.customProject : form.project;
+    
+    const payload = {
+      amount: form.amount,
+      category: form.category,
+      description: form.description,
+      project: finalProject || "Internal",
+      receipt_url: form.receipt_url || null,
+      date: new Date().toISOString().slice(0, 10)
+    };
+
+    // Optimistic Update
+    const tempId = `temp-${Date.now()}`;
+    const optimisticRequest: Reimbursement = {
+      id: tempId,
+      user_id: user.id,
+      user_name: user.user_metadata?.name || user.email?.split('@')[0] || "User",
+      amount: payload.amount,
+      category: payload.category,
+      description: payload.description,
+      project: payload.project,
+      date: payload.date,
+      status: "pending",
+      receipt_url: payload.receipt_url || undefined,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    setRequests(prev => [optimisticRequest, ...prev]);
 
     try {
-      if (!user) throw new Error("Not authenticated");
-
-      const finalProject = project === "__custom__" ? customProject : project;
-      if (!finalProject) throw new Error("Please specify a project");
-
-      const res = await fetchJson<{ data: Reimbursement }>("/api/reimbursements", {
+      await fetchJson("/api/reimbursements", {
         method: "POST",
-        body: JSON.stringify({
-          amount: parseFloat(amount),
-          description,
-          date,
-          project: finalProject,
-          category,
-          receipt_url: receiptUrl || null,
-        }),
+        body: JSON.stringify(payload)
       });
-
-      setAmount("");
-      setDescription("");
-      setReceiptUrl("");
-      setDate(new Date().toISOString().slice(0, 10));
-      setProject("Internal");
-      setCustomProject("");
-      setCategory("Operations");
-      await fetchReimbursements();
+      setForm({
+        amount: 0,
+        category: "Travel",
+        description: "",
+        project: "Internal",
+        customProject: "",
+        receipt_url: ""
+      });
     } catch (err: any) {
-      setError(err.message || "Failed to create reimbursement");
+      setRequests(prevRequests);
+      setError(err.message || "Failed to submit request");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function updateStatus(item: Reimbursement, newStatus: "approved" | "rejected") {
-    setError(null);
-    try {
-      await fetchJson<{ data: Reimbursement }>(`/api/reimbursements/${item.id}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ status: newStatus }),
-      });
+  async function updateStatus(id: string, status: "approved" | "rejected") {
+    const prevRequests = [...requests];
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
 
-      await fetchReimbursements();
+    try {
+      await fetchJson(`/api/reimbursements/${id}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status })
+      });
     } catch (err: any) {
+      setRequests(prevRequests);
       setError(err.message || "Failed to update status");
     }
   }
@@ -175,221 +170,221 @@ export default function ReimbursementsPage() {
   return (
     <AppShell
       title="Reimbursements"
-      subtitle="Submit and track your out-of-pocket expenses"
+      subtitle="Submit business expenses and track approval status"
     >
-      <div className="space-y-6">
-        {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-900/50 p-4 text-sm text-rose-900 dark:text-rose-200">
+      {error && (
+        <div className="mb-8 rounded-2xl border border-rose-200 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-900/50 p-4 text-sm text-rose-900 dark:text-rose-200 flex items-center justify-between shadow-xl animate-in fade-in slide-in-from-top-4">
+          <span className="flex items-center gap-2">
+            <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             {error}
-          </div>
-        )}
+          </span>
+          <button onClick={() => setError(null)} className="ml-4 font-black uppercase text-[10px] hover:opacity-70">Dismiss</button>
+        </div>
+      )}
 
-        {/* File Reimbursement Form */}
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="mb-6 text-base font-bold text-foreground">File New Reimbursement</h2>
-          <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 items-end">
-            <div>
-              <label className="mb-1.5 block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Date</label>
-              <input
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Amount</label>
-              <input
-                type="number"
-                required
-                min="1"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
-                placeholder="0.00"
-              />
-            </div>
-            <div className="flex flex-col gap-0">
-              <label className="mb-1.5 block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Project</label>
-              <select
-                required
-                value={project}
-                onChange={(e) => handleProjectChange(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
-              >
-                <option value="Internal">Internal (BizzGrow)</option>
-                {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                <option value="__custom__">✎ Custom (One-off)</option>
-              </select>
-              {project === "__custom__" && (
+      <div className="grid gap-8 lg:grid-cols-12">
+        {/* Request Form */}
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="lg:col-span-4"
+        >
+          <form
+            onSubmit={onSubmit}
+            className="rounded-3xl glass-card p-6 shadow-2xl sticky top-6"
+          >
+            <h2 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2 mb-6">
+              <span className="h-5 w-5 rounded-lg bg-primary/20 flex items-center justify-center text-primary-foreground">
+                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"/></svg>
+              </span>
+              New Request
+            </h2>
+            <fieldset disabled={submitting} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Amount *</label>
                 <input
-                  type="text"
+                  type="number"
                   required
-                  value={customProject}
-                  onChange={(e) => setCustomProject(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all mt-2"
-                  placeholder="Custom name"
+                  min="0.01"
+                  step="0.01"
+                  className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                  placeholder="0.00"
+                  value={form.amount || ""}
+                  onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
                 />
-              )}
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</label>
-              <select
-                required
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
-              >
-                {EXPENSE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Description</label>
-              <input
-                type="text"
-                required
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
-                placeholder="Expenses details..."
-              />
-            </div>
-            <div className="flex gap-2">
-                <div className="flex-1">
-                    <label className="mb-1.5 block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Receipt</label>
-                    <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold text-muted-foreground cursor-pointer hover:bg-muted/50 transition-all truncate">
-                        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                        </svg>
-                        {submitting ? "..." : receiptUrl ? "Change" : "Upload"}
-                        <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            onChange={uploadFile}
-                            disabled={submitting}
-                            className="hidden"
-                        />
-                    </label>
-                </div>
-                <button
-                    type="submit"
-                    disabled={submitting}
-                    className="self-end rounded-xl bg-foreground text-background px-6 py-2.5 text-sm font-black hover:opacity-90 disabled:opacity-50 transition-all active:scale-95 shadow-md"
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Category *</label>
+                <select
+                  required
+                  className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer backdrop-blur-sm"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
                 >
-                    {submitting ? "..." : "Send"}
-                </button>
-            </div>
-          </form>
-          {receiptUrl && (
-            <div className="mt-3 flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                </span>
-                <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Receipt Ready</p>
-            </div>
-          )}
-        </section>
-
-        {/* Timeline List */}
-        <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[1000px]">
-                <thead className="bg-muted text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">
-                <tr>
-                    <th className="px-5 py-4">Date</th>
-                    <th className="px-5 py-4">Employee</th>
-                    <th className="px-5 py-4">Details</th>
-                    <th className="px-5 py-4">Project</th>
-                    <th className="px-5 py-4 text-right">Amount</th>
-                    <th className="px-5 py-4 text-center">Status</th>
-                    <th className="px-5 py-4 text-center">Receipt</th>
-                    {role !== "employee" && <th className="px-5 py-4 text-center">Actions</th>}
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                {loading && items.length === 0 ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                        <tr key={i} className="animate-pulse">
-                            <td colSpan={role !== "employee" ? 8 : 7} className="px-5 py-5"><div className="h-4 bg-muted rounded w-full"></div></td>
-                        </tr>
-                    ))
-                ) : items.map((item) => (
-                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-5 py-5 text-muted-foreground">{formatDate(item.date)}</td>
-                    <td className="px-5 py-5 font-bold text-foreground">{item.user_name}</td>
-                    <td className="px-5 py-5">
-                        <div className="font-bold text-foreground">{item.category}</div>
-                        <div className="text-xs text-muted-foreground">{item.description}</div>
-                    </td>
-                    <td className="px-5 py-5">
-                        <span className="rounded-lg bg-muted border border-border px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase">
-                            {item.project}
-                        </span>
-                    </td>
-                    <td className="px-5 py-5 font-black text-foreground text-right">{formatCurrency(item.amount)}</td>
-                    <td className="px-5 py-5 text-center">
-                        <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide border shadow-sm ${
-                            item.status === "approved"
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800"
-                            : item.status === "rejected"
-                            ? "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800"
-                            : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800"
-                        }`}
-                        >
-                        {item.status}
-                        </span>
-                    </td>
-                    <td className="px-5 py-5 text-center">
-                        {item.receipt_url ? (
-                        <a href={item.receipt_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 transition-all">
-                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            View
-                        </a>
-                        ) : (
-                        <span className="text-muted-foreground opacity-30 text-[10px] font-bold uppercase tracking-tighter">-</span>
-                        )}
-                    </td>
-                    {role !== "employee" && (
-                        <td className="px-5 py-5">
-                            <div className="flex justify-center gap-2">
-                                <button 
-                                    onClick={() => updateStatus(item, "approved")}
-                                    disabled={item.status === "approved" || item.status === "rejected"}
-                                    className="rounded-lg bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 transition-all active:scale-90 disabled:opacity-30"
-                                >
-                                    Approve
-                                </button>
-                                <button 
-                                    onClick={() => updateStatus(item, "rejected")}
-                                    disabled={item.status === "approved" || item.status === "rejected"}
-                                    className="rounded-lg bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase text-rose-700 hover:bg-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:hover:bg-rose-900/40 border border-rose-100 dark:border-rose-900/50 transition-all active:scale-90 disabled:opacity-30"
-                                >
-                                    Reject
-                                </button>
-                            </div>
-                        </td>
-                    )}
-                    </tr>
-                ))}
-                {!loading && items.length === 0 && (
-                    <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-muted-foreground italic">
-                        No reimbursements in your history.
-                    </td>
-                    </tr>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Description *</label>
+                <textarea
+                  required
+                  rows={3}
+                  className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all resize-none"
+                  placeholder="What was this expense for?"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Project</label>
+                <select
+                  className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer mb-2"
+                  value={form.project}
+                  onChange={(e) => setForm({ ...form, project: e.target.value })}
+                >
+                  <option value="Internal">Internal (BizzGrow)</option>
+                  {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  <option value="__custom__">✎ Custom Project</option>
+                </select>
+                {form.project === "__custom__" && (
+                    <input
+                        type="text"
+                        required
+                        className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
+                        placeholder="Project Name"
+                        value={form.customProject}
+                        onChange={(e) => setForm({ ...form, customProject: e.target.value })}
+                    />
                 )}
-                </tbody>
-            </table>
+              </div>
+              <div className="space-y-1.5">
+                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Receipt</label>
+                 <label className="flex items-center justify-center gap-2 w-full glass-btn glass-btn-secondary border-dashed py-4 backdrop-blur-sm">
+                    <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    {uploading ? "..." : form.receipt_url ? "Change" : "Upload"}
+                    <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => { if (e.target.files?.[0]) uploadFile(e.target.files[0]); }}
+                        disabled={uploading}
+                    />
+                </label>
+                {form.receipt_url && !uploading && (
+                    <p className="text-[10px] text-emerald-600 font-black uppercase text-center mt-1">✓ Receipt Attached</p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={submitting || uploading || isOffline}
+                className="w-full glass-btn glass-btn-primary py-4 mt-2"
+              >
+                {submitting ? "Submitting..." : "Send Request"}
+              </button>
+            </fieldset>
+          </form>
+        </motion.div>
+
+        {/* Requests List */}
+        <div className="lg:col-span-8">
+          <div className="space-y-4">
+            <AnimatePresence mode="popLayout">
+              {loading && requests.length === 0 ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-40 rounded-3xl bg-muted/20 animate-pulse border border-border/50" />
+                ))
+              ) : requests.length === 0 ? (
+                <div className="rounded-3xl glass-card p-12 text-center text-muted-foreground italic shadow-xl font-medium">
+                  No reimbursement requests found.
+                </div>
+              ) : (
+                requests.map((req) => (
+                  <motion.article
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    key={req.id}
+                    className="group relative overflow-hidden rounded-3xl glass-card p-6 shadow-xl transition-all duration-500 hover:shadow-2xl hover:-translate-y-1"
+                  >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">#{req.id.toString().slice(-8)}</span>
+                             <span className={`glass-badge ${
+                                req.status === 'approved' ? 'glass-badge-success' :
+                                req.status === 'rejected' ? 'glass-badge-warning' :
+                                'glass-badge-neutral'
+                            }`}>
+                                {req.status}
+                            </span>
+                        </div>
+                        <h3 className="text-xl font-black tracking-tight text-foreground">{req.description}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-bold text-muted-foreground">
+                            <span className="flex items-center gap-1.5 font-black text-rose-600 dark:text-rose-400">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                {formatCurrency(req.amount)}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                {req.user_name}
+                            </span>
+                            <span className="flex items-center gap-1.5 opacity-60">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                {formatDate(req.date)}
+                            </span>
+                            {req.project && (
+                                <span className="flex items-center gap-1.5 opacity-60">
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                    {req.project}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 min-w-[140px]">
+                      {req.receipt_url && (
+                        <a
+                          href={req.receipt_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="glass-btn glass-btn-secondary px-4 py-2 text-[8px] shadow-sm"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                          View Receipt
+                        </a>
+                      )}
+                      {canApprove && req.status === "pending" && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateStatus(req.id, "approved")}
+                            className="flex-1 glass-btn glass-btn-success py-2 text-[8px]"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => updateStatus(req.id, "rejected")}
+                            className="flex-1 glass-btn glass-btn-danger py-2 text-[8px]"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="absolute -right-4 -bottom-4 h-24 w-24 rounded-full bg-primary/5 blur-2xl group-hover:scale-150 transition-transform duration-700" />
+                </motion.article>
+              ))
+            )}
+            </AnimatePresence>
           </div>
-        </section>
+        </div>
       </div>
     </AppShell>
   );

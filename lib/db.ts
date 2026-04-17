@@ -94,7 +94,9 @@ export async function deleteRow(table: TableName, id: string): Promise<boolean> 
   return true;
 }
 
-export async function getSummary(): Promise<SummaryResponse> {
+import { isSameWeek, isSameMonth, isSameYear, parseISO } from "date-fns";
+
+export async function getSummary(month?: number, year?: number): Promise<SummaryResponse> {
   const income = await listRows<Income>("income");
   const rawExpenses = await listRows<Expense>("expenses");
   const reimbursements = await listRows<Reimbursement>("reimbursements");
@@ -117,6 +119,7 @@ export async function getSummary(): Promise<SummaryResponse> {
 
   const expenses = [...rawExpenses, ...approvedReimbursements];
 
+  // Global totals (All time)
   const totalIncome = income.reduce((sum, row) => sum + toNumber(row.amount), 0);
   const advanceReceived = income
     .filter((row) => row.status === "Advance")
@@ -127,6 +130,37 @@ export async function getSummary(): Promise<SummaryResponse> {
   const totalExpenses = expenses.reduce((sum, row) => sum + toNumber(row.amount), 0);
   const profit = totalIncome - totalExpenses;
 
+  // Period Calculations
+  const now = new Date();
+  const targetYear = year || now.getFullYear();
+  const targetMonth = month || (now.getMonth() + 1);
+
+  const calculatePeriod = (inc: Income[], exp: Expense[], filterFn: (d: string) => boolean) => {
+    const revenue = inc.filter(r => filterFn(r.date)).reduce((sum, r) => sum + toNumber(r.amount), 0);
+    const cost = exp.filter(r => filterFn(r.date)).reduce((sum, r) => sum + toNumber(r.amount), 0);
+    return { revenue, expenses: cost, profit: revenue - cost };
+  };
+
+  const isSelectedMonth = (d: string) => {
+    const date = parseISO(d);
+    return date.getFullYear() === targetYear && (date.getMonth() + 1) === targetMonth;
+  };
+
+  const isSelectedYear = (d: string) => {
+    const date = parseISO(d);
+    return date.getFullYear() === targetYear;
+  };
+
+  const isCurrentWeek = (d: string) => {
+    const date = parseISO(d);
+    return isSameWeek(date, now, { weekStartsOn: 0 }); // Sunday start
+  };
+
+  const thisWeek = calculatePeriod(income, expenses, isCurrentWeek);
+  const thisMonth = calculatePeriod(income, expenses, isSelectedMonth);
+  const thisYear = calculatePeriod(income, expenses, isSelectedYear);
+  const lifetime = { revenue: totalIncome, expenses: totalExpenses, profit };
+
   const expensesByCategory = groupSum(expenses, (row) => row.category || "Uncategorized", (row) => toNumber(row.amount));
   const expensesByPerson = groupSum(expenses, (row) => row.paid_by || "Unknown", (row) => toNumber(row.amount));
 
@@ -136,6 +170,10 @@ export async function getSummary(): Promise<SummaryResponse> {
     pendingPayments,
     totalExpenses,
     profit,
+    thisWeek,
+    thisMonth,
+    thisYear,
+    lifetime,
     expensesByCategory,
     expensesByPerson,
   };

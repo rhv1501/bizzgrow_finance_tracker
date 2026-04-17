@@ -80,9 +80,159 @@
     color: var(--foreground);
     font-family: var(--font-manrope), "Segoe UI", sans-serif;
     transition: background-color 0.3s ease, color 0.3s ease;
+    @apply overflow-x-hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-space-grotesk), "Segoe UI", sans-serif;
+  }
+
+  /* Apple-Style Glassmorphism Utilities */
+  .glass-card {
+    @apply backdrop-blur-xl saturate-150 transition-all duration-500;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+  }
+
+  .dark .glass-card {
+    background: rgba(15, 15, 18, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .glass-header {
+    @apply backdrop-blur-2xl saturate-200 transition-all duration-300;
+    background: rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .glass-header {
+    background: rgba(9, 9, 11, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Vibrant Background Accents */
+  .vibrant-accent {
+    @apply absolute -z-10 blur-[120px] opacity-30 dark:opacity-20 pointer-events-none;
+  }
+
+  /* Glassmorphism Buttons */
+  .glass-btn {
+    @apply backdrop-blur-md saturate-150 transition-all duration-300 font-black uppercase tracking-widest text-[10px] sm:text-xs py-3 px-6 rounded-xl border items-center justify-center flex gap-2 active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-lg active:shadow-inner;
+  }
+
+  /* Variant: Primary (BizzGrow Gold) */
+  .glass-btn-primary {
+    background: rgba(251, 191, 36, 0.2);
+    border-color: rgba(251, 191, 36, 0.3);
+    color: #b45309; /* Deep amber for readability */
+  }
+
+  .dark .glass-btn-primary {
+    background: rgba(251, 191, 36, 0.15);
+    border-color: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+  }
+
+  .glass-btn-primary:hover {
+    background: rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+  }
+
+  /* Variant: Success (Emerald) */
+  .glass-btn-success {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #065f46;
+  }
+
+  .dark .glass-btn-success {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+  }
+
+  .glass-btn-success:hover {
+    background: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+  }
+
+  /* Variant: Danger (Rose) */
+  .glass-btn-danger {
+    background: rgba(244, 63, 94, 0.1);
+    border-color: rgba(244, 63, 94, 0.2);
+    color: #9f1239;
+  }
+
+  .dark .glass-btn-danger {
+    background: rgba(244, 63, 94, 0.08);
+    border-color: rgba(244, 63, 94, 0.15);
+    color: #fb7185;
+  }
+
+  .glass-btn-danger:hover {
+    background: rgba(244, 63, 94, 0.18);
+    box-shadow: 0 0 20px rgba(244, 63, 94, 0.15);
+  }
+
+  /* Variant: Secondary (Slate) */
+  .glass-btn-secondary {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #1e293b;
+  }
+
+  .dark .glass-btn-secondary {
+    background: rgba(15, 15, 18, 0.4);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+  }
+
+  /* Glassmorphism Badges */
+  .glass-badge {
+    @apply backdrop-blur-md saturate-150 inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest border border-white/20 shadow-sm transition-all duration-300;
+  }
+
+  .glass-badge-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #065f46;
+    border-color: rgba(16, 185, 129, 0.2);
+  }
+
+  .dark .glass-badge-success {
+    background: rgba(16, 185, 129, 0.05);
+    color: #10b981;
+  }
+
+  .glass-badge-warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #92400e;
+    border-color: rgba(245, 158, 11, 0.2);
+  }
+
+  .dark .glass-badge-warning {
+    background: rgba(245, 158, 11, 0.05);
+    color: #f59e0b;
+  }
+
+  .glass-badge-neutral {
+    background: rgba(148, 163, 184, 0.1);
+    color: #334155;
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+
+  .dark .glass-badge-neutral {
+    background: rgba(148, 163, 184, 0.05);
+    color: #94a3b8;
+  }
+
+  /* Utility to hide scrollbars while keeping functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

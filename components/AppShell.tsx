@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState, useEffect } from "react";
 import { ThemeToggle } from "./ThemeToggle";
 import Link from "next/link";
@@ -6,6 +8,8 @@ import { Role } from "@/lib/types";
 import { fetchJson } from "@/lib/client-utils";
 import { useSession } from "@/components/SessionProvider";
 import { useGlobalFilter } from "@/components/GlobalFilterProvider";
+import { AnimatePresence } from "framer-motion";
+import PageTransition from "./PageTransition";
 
 type AppShellProps = {
   title: string;
@@ -63,17 +67,23 @@ export function AppShell({
   const years = [0, currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
 
   return (
-    <div className="min-h-screen bg-background text-foreground lg:flex transition-colors duration-300">
+    <div className="min-h-screen bg-background text-foreground lg:flex transition-colors duration-300 relative">
+      
+      {/* Background Ambient Accents - Isolated to prevent scrollbars */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="vibrant-accent top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20" />
+        <div className="vibrant-accent bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-blue-500/20" />
+      </div>
       
       {/* Mobile Sidebar Overlay */}
       <div 
-        className={`fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-40 bg-zinc-950/20 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsMenuOpen(false)}
       />
 
       {/* Mobile Sidebar */}
       <aside 
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-card border-r border-border p-6 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform glass-card border-r-0 m-4 rounded-3xl p-6 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden backdrop-brightness-110 dark:backdrop-brightness-90 ${
           isMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -122,12 +132,12 @@ export function AppShell({
       </aside>
 
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className="mb-6 rounded-2xl border border-border bg-card/70 backdrop-blur-2xl p-5 shadow-xl shadow-slate-200/50 dark:shadow-none transition-all ring-1 ring-white/20">
+        <header className="mb-6 rounded-3xl glass-header p-5 shadow-2xl shadow-slate-200/20 dark:shadow-none transition-all ring-1 ring-white/10">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
               {/* Hamburger Button */}
               <button 
-                className="rounded-xl border border-border bg-card p-2.5 text-muted-foreground lg:hidden hover:bg-muted hover:text-foreground transition-colors"
+                className="rounded-xl border border-border/50 glass-card p-2.5 text-muted-foreground lg:hidden hover:bg-muted/50 hover:text-foreground transition-colors"
                 onClick={() => setIsMenuOpen(true)}
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +147,7 @@ export function AppShell({
               
               <div>
                 <p className="font-mono text-[10px] tracking-[0.2em] text-primary">
-                  FINANCE TRACKER PRO
+                  BIZZGROW TRACKER
                 </p>
                 <h1 className="text-xl font-black tracking-tight text-foreground sm:text-3xl lg:text-4xl">
                   {title}
@@ -149,14 +159,14 @@ export function AppShell({
             <div className="hidden flex-col items-end gap-3 sm:flex lg:flex-row lg:items-center">
               <div className="flex gap-2 text-sm">
                 <select 
-                  className="rounded-xl border border-border bg-card px-3 py-2 text-foreground font-bold hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer"
+                  className="rounded-xl border border-border/50 glass-card px-3 py-2 text-foreground font-bold hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer"
                   value={month} 
                   onChange={(e) => setFilter({ month: Number(e.target.value), year })}
                 >
                   {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
                 <select 
-                  className="rounded-xl border border-border bg-card px-3 py-2 text-foreground font-bold hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer"
+                  className="rounded-xl border border-border/50 glass-card px-3 py-2 text-foreground font-bold hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer"
                   value={year} 
                   onChange={(e) => setFilter({ month, year: Number(e.target.value) })}
                 >
@@ -170,7 +180,7 @@ export function AppShell({
                 </span>
                 <ThemeToggle />
                 <button
-                  className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground hover:bg-muted hover:border-border/50 transition-all disabled:opacity-50 shadow-sm active:scale-95"
+                  className="glass-btn glass-btn-secondary px-4 py-2"
                   onClick={logout}
                   disabled={isLoggingOut}
                 >
@@ -219,11 +229,19 @@ export function AppShell({
                 >
                     {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
+                <select 
+                  className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold"
+                  value={year} 
+                  onChange={(e) => setFilter({ month, year: Number(e.target.value) })}
+                >
+                  <option value={0}>All Years</option>
+                  {years.filter(y => y > 0).map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
               </div>
               <div className="flex items-center gap-2">
                 <ThemeToggle />
                 <button
-                    className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground"
+                    className="glass-btn glass-btn-secondary px-4 py-2 text-[10px]"
                     onClick={logout}
                     disabled={isLoggingOut}
                 >
@@ -234,7 +252,11 @@ export function AppShell({
         </header>
         
         <main className="focus:outline-none">
-          {children}
+          <AnimatePresence mode="wait">
+            <PageTransition key={pathname + month + year}>
+              {children}
+            </PageTransition>
+          </AnimatePresence>
         </main>
       </div>
     </div>

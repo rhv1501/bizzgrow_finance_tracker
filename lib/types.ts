@@ -67,12 +67,22 @@ export interface Expense {
   updated_at: string;
 }
 
+export interface PeriodStats {
+  revenue: number;
+  expenses: number;
+  profit: number;
+}
+
 export interface SummaryResponse {
   totalIncome: number;
   advanceReceived: number;
   pendingPayments: number;
   totalExpenses: number;
   profit: number;
+  thisWeek: PeriodStats;
+  thisMonth: PeriodStats;
+  thisYear: PeriodStats;
+  lifetime: PeriodStats;
   expensesByCategory: Array<{ label: string; amount: number }>;
   expensesByPerson: Array<{ label: string; amount: number }>;
 }

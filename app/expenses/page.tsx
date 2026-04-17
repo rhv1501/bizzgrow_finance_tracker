@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useSession } from "@/components/SessionProvider";
 import { useOffline } from "@/components/OfflineProvider";
 import { Expense, User } from "@/lib/types";
+import { motion, AnimatePresence } from "framer-motion";
 
 const defaultForm = {
   date: new Date().toISOString().slice(0, 10),
@@ -105,15 +106,35 @@ export default function ExpensesPage() {
   async function submitExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
+    const prevRows = [...rawRows];
+
+    // Optimistic Update
+    if (editingId) {
+      setRawRows(prev => prev.map(r => r.id === editingId ? { ...r, ...form } as any : r));
+    } else {
+      const tempId = `temp-${crypto.randomUUID()}`;
+      const tempEntry = { 
+        ...form, 
+        id: tempId, 
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      setRawRows(prev => [tempEntry as any, ...prev]);
+    }
+
     try {
       if (editingId) {
-        await createClient().from("expenses").update(form).eq("id", editingId);
+        const { error } = await createClient().from("expenses").update(form).eq("id", editingId);
+        if (error) throw error;
         setEditingId(null);
       } else {
-        await createClient().from("expenses").insert(form);
+        const { error } = await createClient().from("expenses").insert(form);
+        if (error) throw error;
       }
       setForm(defaultForm);
+      setError(null);
     } catch (err) {
+      setRawRows(prevRows); // Rollback
       setError(err instanceof Error ? err.message : "Failed to save expense");
     } finally {
       setSubmitting(false);
@@ -141,10 +162,19 @@ export default function ExpensesPage() {
   }
 
   async function deleteExpense(id: string) {
+    if (!confirm("Are you sure you want to delete this expense?")) return;
     setDeletingId(id);
+    const prevRows = [...rawRows];
+    
+    // Optimistic Delete
+    setRawRows(prev => prev.filter(r => r.id !== id));
+
     try {
-      await createClient().from("expenses").delete().eq("id", id);
+      const { error } = await createClient().from("expenses").delete().eq("id", id);
+      if (error) throw error;
+      setError(null);
     } catch (err) {
+      setRawRows(prevRows); // Rollback
       setError(err instanceof Error ? err.message : "Failed to delete expense");
     } finally {
       setDeletingId(null);
@@ -169,30 +199,36 @@ export default function ExpensesPage() {
       )}
 
       {canCreate && (
-        <form
+        <motion.form
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           onSubmit={submitExpense}
-          className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm"
+          className="mb-8 rounded-3xl glass-card p-6 shadow-2xl overflow-visible"
         >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-bold text-foreground">
-              {editingId ? "Edit Expense Entry" : "Add New Expense"}
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
+              <span className="h-5 w-5 rounded-lg bg-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"/></svg>
+              </span>
+              {editingId ? "Edit Expense Entry" : "Register Expense"}
             </h2>
             {editingId && (
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="text-xs font-medium text-slate-500 hover:text-slate-800"
+                className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-rose-600 transition-colors"
               >
-                Cancel Edit
+                Cancel Edit ×
               </button>
             )}
           </div>
           <fieldset
             disabled={submitting}
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer"
               type="date"
               value={form.date}
               onChange={(event) =>
@@ -201,7 +237,7 @@ export default function ExpensesPage() {
               required
             />
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
               placeholder="Item name / description"
               value={form.item}
               onChange={(event) =>
@@ -210,7 +246,7 @@ export default function ExpensesPage() {
               required
             />
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
               placeholder="Project / Client"
               value={form.project}
               onChange={(event) =>
@@ -219,7 +255,7 @@ export default function ExpensesPage() {
             />
             
             <select
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all disabled:opacity-50"
+              className="rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer backdrop-blur-sm disabled:opacity-50"
               value={form.paid_by}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, paid_by: event.target.value }))
@@ -235,7 +271,7 @@ export default function ExpensesPage() {
             </select>
 
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all"
               type="number"
               min={1}
               placeholder="Amount"
@@ -249,7 +285,7 @@ export default function ExpensesPage() {
               required
             />
             <select
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all disabled:opacity-50"
+              className="rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary outline-none transition-all cursor-pointer backdrop-blur-sm disabled:opacity-50"
               value={form.category}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, category: event.target.value }))
@@ -268,7 +304,7 @@ export default function ExpensesPage() {
               <option value="Other">Other</option>
             </select>
             <input
-              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium lg:col-span-1 focus:ring-2 focus:ring-primary outline-none transition-all"
+              className="rounded-xl border border-border/50 bg-background/50 px-3 py-2.5 text-sm font-bold lg:col-span-1 focus:ring-2 focus:ring-primary outline-none transition-all"
               placeholder="Internal notes"
               value={form.notes}
               onChange={(event) =>
@@ -276,11 +312,11 @@ export default function ExpensesPage() {
               }
             />
             <div className="lg:col-span-1">
-              <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold text-muted-foreground cursor-pointer hover:bg-muted/50 transition-all">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <label className="flex items-center gap-2 glass-btn glass-btn-secondary py-2.5 px-3 backdrop-blur-sm">
+                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
-                {uploading ? "Uploading..." : form.receipt_url ? "Change Receipt" : "Upload Receipt"}
+                {uploading ? "..." : form.receipt_url ? "Change" : "Upload"}
                 <input
                     type="file"
                     accept="image/*,.pdf"
@@ -292,39 +328,39 @@ export default function ExpensesPage() {
                 />
               </label>
               {form.receipt_url && !uploading && (
-                <a href={form.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-600 font-bold block mt-1 hover:underline ml-1">
+                <a href={form.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-600 font-black uppercase block mt-1 hover:underline ml-1">
                   ✓ Receipt Attached
                 </a>
               )}
             </div>
           </fieldset>
           <button
-            className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="mt-6 glass-btn glass-btn-danger w-full sm:w-auto"
             type="submit"
             disabled={submitting || uploading}
           >
-            {submitting ? "Saving…" : editingId ? "Update Expense" : "Add Expense"}
+            {submitting ? "Processing…" : editingId ? "Update Expense" : "Save Expense"}
           </button>
-        </form>
+        </motion.form>
       )}
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <section className="overflow-hidden rounded-3xl glass-card shadow-2xl transition-all duration-500 hover:shadow-primary/5">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="bg-muted text-left text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border">
+            <thead className="text-left text-[10px] uppercase font-black tracking-widest text-muted-foreground border-b border-border/50">
               <tr>
-                <th className="px-5 py-4">Date</th>
-                <th className="px-5 py-4">Item</th>
-                <th className="px-5 py-4">Project</th>
-                <th className="px-5 py-4">Paid By</th>
-                <th className="px-5 py-4">Category</th>
-                <th className="px-5 py-4">Amount</th>
-                <th className="px-5 py-4">Notes</th>
-                <th className="px-5 py-4">Receipt</th>
-                <th className="px-5 py-4 text-center">Actions</th>
+                <th className="px-6 py-5">Date</th>
+                <th className="px-6 py-5">Item</th>
+                <th className="px-6 py-5">Project</th>
+                <th className="px-6 py-5">Paid By</th>
+                <th className="px-6 py-5">Category</th>
+                <th className="px-6 py-5">Amount</th>
+                <th className="px-6 py-5 font-bold">Notes</th>
+                <th className="px-6 py-5">Receipt</th>
+                <th className="px-6 py-5 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/30">
               {loading && rawRows.length === 0 ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr
@@ -355,7 +391,7 @@ export default function ExpensesPage() {
                     <td className="px-5 py-4 text-muted-foreground">{row.project}</td>
                     <td className="px-5 py-4 font-medium text-foreground">{row.paid_by}</td>
                     <td className="px-5 py-4">
-                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-400">
+                        <span className="glass-badge glass-badge-neutral">
                             {row.category}
                         </span>
                     </td>
@@ -365,7 +401,7 @@ export default function ExpensesPage() {
                     <td className="px-5 py-4 text-muted-foreground max-w-xs truncate">{row.notes || "-"}</td>
                     <td className="px-5 py-4">
                       {row.receipt_url ? (
-                        <a href={row.receipt_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 transition-all">
+                        <a href={row.receipt_url} target="_blank" rel="noreferrer" className="glass-btn glass-btn-secondary px-2 py-1 text-[8px]">
                           <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -380,7 +416,7 @@ export default function ExpensesPage() {
                         <div className="flex justify-center gap-2">
                             {canCreate && (
                                 <button
-                                className="rounded-lg bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 border border-blue-100 dark:border-blue-900/50 transition-all disabled:opacity-40"
+                                className="glass-btn glass-btn-secondary px-3 py-1.5 text-[8px]"
                                 onClick={() => startEdit(row)}
                                 disabled={deletingId === row.id || editingId === row.id}
                                 >
@@ -389,7 +425,7 @@ export default function ExpensesPage() {
                             )}
                             {canDelete ? (
                                 <button
-                                className="rounded-lg bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:hover:bg-rose-900/40 border border-rose-100 dark:border-rose-900/50 transition-all disabled:opacity-40"
+                                className="glass-btn glass-btn-danger px-3 py-1.5 text-[8px]"
                                 onClick={() => deleteExpense(row.id)}
                                 disabled={deletingId === row.id}
                                 >
