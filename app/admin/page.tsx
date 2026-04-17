@@ -543,7 +543,7 @@ export default function AdminPage() {
                   {auditLogs.map((log) => (
                     <div key={log.id} className="rounded-xl bg-white/30 dark:bg-white/5 p-3 border border-white/10 text-[11px]">
                       <div className="flex justify-between items-start mb-1 text-muted-foreground uppercase font-black tracking-widest text-[9px]">
-                        <span>{log.user_name}</span>
+                        <span>{log.actor_email}</span>
                         <span>{formatDate(log.created_at)}</span>
                       </div>
                       <p className="text-foreground font-bold line-clamp-2">{log.action}</p>

@@ -117,7 +117,7 @@ export default function ReimbursementsPage() {
     const optimisticRequest: Reimbursement = {
       id: tempId,
       user_id: user.id,
-      user_name: user.user_metadata?.name || user.email?.split('@')[0] || "User",
+      user_name: user.name || user.email?.split('@')[0] || "User",
       amount: payload.amount,
       category: payload.category,
       description: payload.description,
